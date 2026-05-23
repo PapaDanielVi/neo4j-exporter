@@ -1,0 +1,25 @@
+{{- if .Values.custom.queries }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "neo4j-exporter.fullname" . }}-config
+  labels:
+    {{- include "neo4j-exporter.labels" . | nindent 4 }}
+data:
+  custom_queries.yaml: |
+    {{- toYaml .Values.custom.queries | nindent 4 }}
+{{- end }}
+{{- if .Values.custom.luaScripts }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "neo4j-exporter.fullname" . }}-lua
+  labels:
+    {{- include "neo4j-exporter.labels" . | nindent 4 }}
+data:
+  {{- range $name, $script := .Values.custom.luaScripts }}
+  {{ $name }}: |
+    {{- $script | nindent 4 }}
+  {{- end }}
+{{- end }}

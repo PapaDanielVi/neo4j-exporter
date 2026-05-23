@@ -1,0 +1,12 @@
+custom_queries:
+  - query: "MATCH (u:User {status: 'suspended'}) RETURN count(u) as count"
+    metric_name: "neo4j_custom_suspended_users_total"
+    type: "gauge"
+    help: "Total number of currently suspended user profiles"
+
+  - query: "MATCH (n) RETURN labels(n) as label, count(n) as count"
+    metric_name: "neo4j_custom_nodes_by_label"
+    type: "gauge"
+    help: "Number of nodes grouped by label"
+    labels:
+      group: "topology"

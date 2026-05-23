@@ -1,0 +1,6 @@
+apiVersion: v2
+name: neo4j-exporter
+description: Prometheus exporter for Neo4j databases
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
