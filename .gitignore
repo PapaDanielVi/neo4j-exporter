@@ -32,3 +32,4 @@ go.work.sum
 .vscode/
 
 *PLAN.md
+/neo4j-exporter
