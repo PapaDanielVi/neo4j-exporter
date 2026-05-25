@@ -1,0 +1,485 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Exporter Up",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_exporter_up{target=~\"$target\"}",
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": 1, "options": { "0": { "text": "DOWN", "color": "red" } } },
+            { "type": 1, "options": { "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "value": 0, "color": "red" },
+              { "value": 1, "color": "green" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "title": "Synthetic Query Latency",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_synthetic_query_duration_seconds{target=~\"$target\"}",
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 0.05, "color": "yellow" },
+              { "value": 0.2, "color": "red" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value"
+      }
+    },
+    {
+      "title": "JVM Uptime",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_uptime_seconds{target=~\"$target\"}",
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dtdurations"
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "title": "Heavy Queries Active",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_dbms_heavy_queries_active{target=~\"$target\"}",
+          "legendFormat": "{{target}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 1, "color": "yellow" },
+              { "value": 5, "color": "red" }
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value"
+      }
+    },
+    {
+      "title": "JVM Threads",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_threads_total{target=~\"$target\"}",
+          "legendFormat": "Total ({{target}})",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_jvm_threads_daemon{target=~\"$target\"}",
+          "legendFormat": "Daemon ({{target}})",
+          "refId": "B"
+        },
+        {
+          "expr": "neo4j_jvm_threads_peak{target=~\"$target\"}",
+          "legendFormat": "Peak ({{target}})",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "JVM Loaded Classes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_classes_loaded{target=~\"$target\"}",
+          "legendFormat": "Loaded ({{target}})",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_jvm_classes_unloaded_total{target=~\"$target\"}",
+          "legendFormat": "Unloaded total ({{target}})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "NIO Buffer Pools — Used Bytes",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_buffer_pool_used_bytes{target=~\"$target\"}",
+          "legendFormat": "{{pool}} ({{target}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15
+          }
+        }
+      }
+    },
+    {
+      "title": "NIO Buffer Pools — Capacity vs Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_buffer_pool_capacity_bytes{target=~\"$target\"}",
+          "legendFormat": "Capacity {{pool}}",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_jvm_buffer_pool_used_bytes{target=~\"$target\"}",
+          "legendFormat": "Used {{pool}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "NIO Buffer Pool Count",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_jvm_buffer_pool_count{target=~\"$target\"}",
+          "legendFormat": "{{pool}} ({{target}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "Heavy Queries — Page Faults",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_dbms_heavy_queries_page_faults{target=~\"$target\"}",
+          "legendFormat": "Page faults ({{target}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15
+          }
+        }
+      }
+    },
+    {
+      "title": "Scrape Duration by Phase",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_exporter_scrape_duration_seconds{phase!=\"total\", target=~\"$target\"}",
+          "legendFormat": "{{phase}} ({{target}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "title": "Total Scrape Duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_exporter_scrape_duration_seconds{phase=\"total\", target=~\"$target\"}",
+          "legendFormat": "Total ({{target}})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15
+          },
+          "thresholds": {
+            "steps": [
+              { "value": 0, "color": "green" },
+              { "value": 5, "color": "yellow" },
+              { "value": 9, "color": "red" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "GDS — JVM Heap",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_gds_jvm_max_heap_bytes{target=~\"$target\"}",
+          "legendFormat": "Max ({{target}})",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_gds_jvm_total_heap_bytes{target=~\"$target\"}",
+          "legendFormat": "Total ({{target}})",
+          "refId": "B"
+        },
+        {
+          "expr": "neo4j_gds_jvm_free_heap_bytes{target=~\"$target\"}",
+          "legendFormat": "Free ({{target}})",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      },
+      "description": "GDS system monitor heap metrics. Only available when GDS plugin is installed."
+    },
+    {
+      "title": "GDS — CPU Cores",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_gds_jvm_available_cpu_cores{target=~\"$target\"}",
+          "legendFormat": "Available ({{target}})",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_gds_available_cpu_cores_not_requested{target=~\"$target\"}",
+          "legendFormat": "Not Requested ({{target}})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      },
+      "description": "CPU cores available to GDS procedures."
+    },
+    {
+      "title": "GDS — Ongoing Procedures",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_gds_ongoing_procedures{target=~\"$target\"}",
+          "legendFormat": "{{target}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 15
+          }
+        }
+      }
+    },
+    {
+      "title": "GDS — Memory Usage",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "expr": "neo4j_gds_graph_memory_bytes{target=~\"$target\"}",
+          "legendFormat": "Graph Memory ({{target}})",
+          "refId": "A"
+        },
+        {
+          "expr": "neo4j_gds_task_memory_bytes{target=~\"$target\"}",
+          "legendFormat": "Task Memory ({{target}})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "fillOpacity": 10
+          }
+        }
+      }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["neo4j", "exporter"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "label": "Prometheus",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "options": [],
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false
+      },
+      {
+        "name": "target",
+        "type": "query",
+        "label": "Target",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(neo4j_exporter_up, target)",
+        "sort": 1,
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Neo4j Exporter",
+  "uid": "neo4j-exporter",
+  "version": 1,
+  "weekStart": ""
+}
