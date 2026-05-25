@@ -81,6 +81,6 @@ func (cc *CustomCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect is a placeholder — actual query execution happens in the main collector.
-func (cc *CustomCollector) Collect(ch chan<- prometheus.Metric) {
+func (cc *CustomCollector) Collect(_ chan<- prometheus.Metric) {
 	// Custom YAML queries are executed inline by the main collector.
 }

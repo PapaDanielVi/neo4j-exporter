@@ -1,3 +1,4 @@
+// Package driverpool provides a simple in-memory cache of Neo4j driver instances keyed by URI.
 package driverpool
 
 import (
@@ -8,10 +9,11 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 const (
-	idleTimeout    = 5 * time.Minute
+	idleTimeout     = 5 * time.Minute
 	cleanupInterval = 1 * time.Minute
 )
 
@@ -51,7 +53,7 @@ func (p *Pool) Get(ctx context.Context, uri, user, password string) (neo4j.Drive
 	p.mu.Unlock()
 
 	// Build driver outside the lock
-	driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(user, password, ""), func(c *neo4j.Config) {
+	driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(user, password, ""), func(c *config.Config) {
 		c.MaxConnectionPoolSize = 5
 		c.ConnectionAcquisitionTimeout = 5 * time.Second
 	})
@@ -60,7 +62,7 @@ func (p *Pool) Get(ctx context.Context, uri, user, password string) (neo4j.Drive
 	}
 
 	if err := driver.VerifyConnectivity(ctx); err != nil {
-		driver.Close(ctx)
+		_ = driver.Close(ctx)
 		return nil, fmt.Errorf("verifying connectivity to %s: %w", uri, err)
 	}
 
@@ -68,7 +70,7 @@ func (p *Pool) Get(ctx context.Context, uri, user, password string) (neo4j.Drive
 	// Double-check: another goroutine may have inserted while we were building
 	if existing, ok := p.drivers[uri]; ok {
 		p.mu.Unlock()
-		driver.Close(ctx)
+		_ = driver.Close(ctx)
 		existing.lastUsed = time.Now()
 		return existing.driver, nil
 	}

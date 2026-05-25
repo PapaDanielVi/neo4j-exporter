@@ -1,3 +1,4 @@
+// Package luaengine provides a Lua scripting engine for defining custom metrics based on Neo4j queries.
 package luaengine
 
 import (
@@ -7,15 +8,14 @@ import (
 	"os"
 	"path/filepath"
 
-	lua "github.com/yuin/gopher-lua"
 	"github.com/prometheus/client_golang/prometheus"
+	lua "github.com/yuin/gopher-lua"
 )
 
 // Engine manages Lua script execution for custom metrics.
 type Engine struct {
-	dir       string
-	scripts   []*lua.LFunction
-	metrics   []prometheus.Metric
+	dir     string
+	scripts []*lua.LFunction
 }
 
 // New creates a Lua engine, loading all .lua files from dir.
@@ -43,17 +43,17 @@ func (e *Engine) loadScripts() error {
 		path := filepath.Join(e.dir, entry.Name())
 		slog.Info("loading lua script", "file", path)
 
-		L := lua.NewState()
-		defer L.Close()
+		ls := lua.NewState()
+		defer ls.Close()
 
-		if err := L.DoFile(path); err != nil {
+		if err := ls.DoFile(path); err != nil {
 			slog.Warn("failed to load lua script", "file", path, "err", err)
 			continue
 		}
 
 		// Each file's main chunk is treated as a callable function.
 		// We store the compiled function for re-execution.
-		prototype := L.GetGlobal(entry.Name())
+		prototype := ls.GetGlobal(entry.Name())
 		if fn, ok := prototype.(*lua.LFunction); ok {
 			e.scripts = append(e.scripts, fn)
 		}
@@ -62,26 +62,26 @@ func (e *Engine) loadScripts() error {
 }
 
 // Execute runs all loaded Lua scripts with the given Neo4j query function and metric recorder.
-func (e *Engine) Execute(ctx context.Context, queryFn func(string) ([]map[string]interface{}, error), gatherer chan<- prometheus.Metric) {
+func (e *Engine) Execute(_ context.Context, queryFn func(string) ([]map[string]any, error), gatherer chan<- prometheus.Metric) {
 	if len(e.scripts) == 0 {
 		return
 	}
 
 	for i, fn := range e.scripts {
-		L := lua.NewState()
+		ls := lua.NewState()
 		// Set up Go bindings
-		L.SetGlobal("neo4j_query", L.NewFunction(func(l *lua.LState) int {
+		ls.SetGlobal("neo4j_query", ls.NewFunction(func(l *lua.LState) int {
 			cypher := l.CheckString(1)
 			records, err := queryFn(cypher)
 			if err != nil {
 				l.RaiseError("neo4j query error: %s", err.Error())
 				return 0
 			}
-			tbl := L.NewTable()
+			tbl := ls.NewTable()
 			for _, rec := range records {
-				row := L.NewTable()
+				row := ls.NewTable()
 				for k, v := range rec {
-					row.RawSetString(k, toLuaValue(L, v))
+					row.RawSetString(k, toLuaValue(v))
 				}
 				tbl.Append(row)
 			}
@@ -89,7 +89,7 @@ func (e *Engine) Execute(ctx context.Context, queryFn func(string) ([]map[string
 			return 1
 		}))
 
-		L.SetGlobal("prometheus_record_gauge", L.NewFunction(func(l *lua.LState) int {
+		ls.SetGlobal("prometheus_record_gauge", ls.NewFunction(func(l *lua.LState) int {
 			name := l.CheckString(1)
 			value := float64(l.CheckNumber(2))
 			nLabels := l.GetTop()
@@ -113,15 +113,15 @@ func (e *Engine) Execute(ctx context.Context, queryFn func(string) ([]map[string
 		}))
 
 		// Push the script function and call it
-		L.Push(fn)
-		if err := L.PCall(0, lua.MultRet, nil); err != nil {
+		ls.Push(fn)
+		if err := ls.PCall(0, lua.MultRet, nil); err != nil {
 			slog.Warn("lua script execution failed", "script_index", i, "err", err)
 		}
-		L.Close()
+		ls.Close()
 	}
 }
 
-func toLuaValue(L *lua.LState, v interface{}) lua.LValue {
+func toLuaValue(v any) lua.LValue {
 	switch val := v.(type) {
 	case nil:
 		return lua.LNil

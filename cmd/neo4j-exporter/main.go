@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/collector"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/config"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/discovery"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/driverpool"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/luaengine"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -153,7 +153,7 @@ func main() {
 	// Health endpoints
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -168,25 +168,23 @@ func main() {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ready"))
+		_, _ = w.Write([]byte("ready"))
 	})
 
 	// Start server
 	addr := cfg.ListenAddress
-		if !strings.Contains(addr, ":") {
-			addr = ":" + addr
-		}
+	if !strings.Contains(addr, ":") {
+		addr = ":" + addr
+	}
 	slog.Info("listening", "address", addr)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if err := http.ListenAndServe(addr, mux); err != nil {
 			slog.Error("http server error", "err", err)
 			os.Exit(1)
 		}
-	}()
+	})
 
 	wg.Wait()
 }

@@ -41,8 +41,8 @@ type Collector struct {
 	gdsFreeHeap                      *prometheus.Desc
 	gdsTotalHeap                     *prometheus.Desc
 	gdsMaxHeap                       *prometheus.Desc
-	gdsJvmAvailableCpuCores          *prometheus.Desc
-	gdsAvailableCpuCoresNotRequested *prometheus.Desc
+	gdsJvmAvailableCPUCores          *prometheus.Desc
+	gdsAvailableCPUCoresNotRequested *prometheus.Desc
 	gdsOngoingProcedures             *prometheus.Desc
 	gdsGraphMemoryBytes              *prometheus.Desc
 	gdsTaskMemoryBytes               *prometheus.Desc
@@ -85,8 +85,8 @@ func New(target string, driver neo4j.DriverWithContext) *Collector {
 		gdsFreeHeap:                      prometheus.NewDesc(ns+"_gds_jvm_free_heap_bytes", "Free JVM heap bytes from GDS system monitor", labels, nil),
 		gdsTotalHeap:                     prometheus.NewDesc(ns+"_gds_jvm_total_heap_bytes", "Total JVM heap bytes from GDS system monitor", labels, nil),
 		gdsMaxHeap:                       prometheus.NewDesc(ns+"_gds_jvm_max_heap_bytes", "Max JVM heap bytes from GDS system monitor", labels, nil),
-		gdsJvmAvailableCpuCores:          prometheus.NewDesc(ns+"_gds_jvm_available_cpu_cores", "Logical CPU cores available to JVM", labels, nil),
-		gdsAvailableCpuCoresNotRequested: prometheus.NewDesc(ns+"_gds_available_cpu_cores_not_requested", "CPU cores not requested by GDS procedures", labels, nil),
+		gdsJvmAvailableCPUCores:          prometheus.NewDesc(ns+"_gds_jvm_available_cpu_cores", "Logical CPU cores available to JVM", labels, nil),
+		gdsAvailableCPUCoresNotRequested: prometheus.NewDesc(ns+"_gds_available_cpu_cores_not_requested", "CPU cores not requested by GDS procedures", labels, nil),
 		gdsOngoingProcedures:             prometheus.NewDesc(ns+"_gds_ongoing_procedures", "Number of currently running GDS procedures", labels, nil),
 		gdsGraphMemoryBytes:              prometheus.NewDesc(ns+"_gds_graph_memory_bytes", "Memory used by GDS projected graphs", labels, nil),
 		gdsTaskMemoryBytes:               prometheus.NewDesc(ns+"_gds_task_memory_bytes", "Memory estimated for running GDS tasks", labels, nil),
@@ -131,7 +131,7 @@ func (c *Collector) DetectVersion(ctx context.Context) {
 	versionStr, _ := versionsList[0].(string)
 
 	var major, minor int
-	fmt.Sscanf(versionStr, "%d.%d", &major, &minor)
+	_, _ = fmt.Sscanf(versionStr, "%d.%d", &major, &minor)
 
 	c.neo4jMajorVersion = major
 	c.neo4jMinorVersion = minor
@@ -155,7 +155,7 @@ func (c *Collector) allDescs() []*prometheus.Desc {
 		c.jvmThreadsPeak, c.jvmThreadsDaemon, c.jvmThreadsTotal,
 		c.jvmClassesLoaded, c.jvmClassesUnloaded, c.jvmUptime,
 		c.gdsFreeHeap, c.gdsTotalHeap, c.gdsMaxHeap,
-		c.gdsJvmAvailableCpuCores, c.gdsAvailableCpuCoresNotRequested,
+		c.gdsJvmAvailableCPUCores, c.gdsAvailableCPUCoresNotRequested,
 		c.gdsOngoingProcedures, c.gdsGraphMemoryBytes, c.gdsTaskMemoryBytes,
 		c.heavyQueriesActive, c.heavyQueriesFaults, c.syntheticQueryDur,
 	}
@@ -236,36 +236,6 @@ func jmxValue(raw any) (float64, bool) {
 	default:
 		return 0, false
 	}
-}
-
-// jmxQuery runs a single-attribute JMX query and emits the metric.
-func (c *Collector) jmxQuery(ctx context.Context, ch chan<- prometheus.Metric, labels []string,
-	key string, desc *prometheus.Desc, mbean string, attr string, mtype prometheus.ValueType) {
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
-	defer session.Close(ctx)
-
-	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes[$attr] AS value",
-		map[string]any{"mbean": mbean, "attr": attr})
-	if err != nil {
-		slog.Warn("JMX query failed", "key", key, "err", err)
-		return
-	}
-	rec, err := result.Single(ctx)
-	if err != nil {
-		slog.Warn("JMX result error", "key", key, "err", err)
-		return
-	}
-	val, _ := rec.Get("value")
-	if val == nil {
-		return
-	}
-	fval, ok := jmxValue(val)
-	if !ok {
-		slog.Warn("unexpected JMX value type", "key", key, "type", fmt.Sprintf("%T", val))
-		return
-	}
-	ch <- prometheus.MustNewConstMetric(desc, mtype, fval, labels...)
 }
 
 // jmxQueryMulti runs a JMX query returning all attributes as a map, then emits multiple metrics.

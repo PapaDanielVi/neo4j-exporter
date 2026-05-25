@@ -1,0 +1,35 @@
+name: Publish Helm Chart to GHCR
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+
+jobs:
+  publish-helm:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v5
+
+      - name: Login to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package and Push Helm Chart
+        run: |
+          CHART_PATH="charts/neo4j-exporter"
+
+          helm package $CHART_PATH --destination .
+
+          CHART_FILE=$(ls *.tgz | head -n 1)
+
+          helm push $CHART_FILE oci://ghcr.io/${{ github.repository_owner }}

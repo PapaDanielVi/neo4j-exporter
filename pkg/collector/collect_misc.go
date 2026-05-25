@@ -30,8 +30,8 @@ func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric,
 		"freeHeap":                      c.gdsFreeHeap,
 		"totalHeap":                     c.gdsTotalHeap,
 		"maxHeap":                       c.gdsMaxHeap,
-		"jvmAvailableCpuCores":          c.gdsJvmAvailableCpuCores,
-		"availableCpuCoresNotRequested": c.gdsAvailableCpuCoresNotRequested,
+		"jvmAvailableCpuCores":          c.gdsJvmAvailableCPUCores,
+		"availableCpuCoresNotRequested": c.gdsAvailableCPUCoresNotRequested,
 	}
 	for key, desc := range heapMetrics {
 		if val, ok := rec.Get(key); ok && val != nil {
