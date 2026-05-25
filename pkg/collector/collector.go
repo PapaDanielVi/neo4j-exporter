@@ -15,8 +15,11 @@ const scrapeTimeout = 10 * time.Second
 
 // Collector implements prometheus.Collector for Neo4j metrics.
 type Collector struct {
-	driver neo4j.DriverWithContext
-	target string
+	driver          neo4j.DriverWithContext
+	target          string
+	neo4jMajorVersion int
+	neo4jMinorVersion int
+	isEnterprise    bool
 
 	// Exporter self-metrics
 	up             *prometheus.Desc
@@ -357,6 +360,54 @@ func New(target string, driver neo4j.DriverWithContext) *Collector {
 	return c
 }
 
+// DetectVersion queries dbms.components() to determine the Neo4j version and edition.
+// Safe to call multiple times; subsequent calls are no-ops once detected.
+func (c *Collector) DetectVersion(ctx context.Context) {
+	if c.neo4jMajorVersion != 0 {
+		return
+	}
+
+	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
+	defer session.Close(ctx)
+
+	result, err := session.Run(ctx, "CALL dbms.components() YIELD versions, edition RETURN versions, edition", nil)
+	if err != nil {
+		slog.Warn("version detection failed", "err", err)
+		return
+	}
+	rec, err := result.Single(ctx)
+	if err != nil {
+		slog.Warn("version detection: no result", "err", err)
+		return
+	}
+
+	versionsVal, _ := rec.Get("versions")
+	editionVal, _ := rec.Get("edition")
+
+	versionsList, ok := versionsVal.([]any)
+	if !ok || len(versionsList) == 0 {
+		slog.Warn("version detection: unexpected versions type", "type", fmt.Sprintf("%T", versionsVal))
+		return
+	}
+	versionStr, _ := versionsList[0].(string)
+
+	editionStr := "community"
+	if editionVal != nil {
+		editionStr, _ = editionVal.(string)
+	}
+
+	var major, minor int
+	fmt.Sscanf(versionStr, "%d.%d", &major, &minor)
+
+	c.neo4jMajorVersion = major
+	c.neo4jMinorVersion = minor
+	c.isEnterprise = editionStr == "enterprise"
+
+	slog.Info("detected Neo4j version",
+		"version", versionStr, "edition", editionStr,
+		"major", major, "minor", minor)
+}
+
 // Describe implements prometheus.Collector.
 func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range c.allDescs() {
@@ -425,36 +476,45 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	}
 	ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 1, targetLabel...)
 
+	// Detect version (replaces the old synthetic canary which did the same query).
+	c.DetectVersion(ctx)
+
 	var wg sync.WaitGroup
 
 	type namedCollector struct {
-		name string
-		fn   func(context.Context, chan<- prometheus.Metric, []string)
+		name     string
+		fn       func(context.Context, chan<- prometheus.Metric, []string)
+		needsEnterprise bool
 	}
 
 	collectors := []namedCollector{
-		{"jmx", c.collectJMX},
-		{"nio_buffers", c.collectNIOBufferPools},
-		{"threading", c.collectThreading},
-		{"classloading", c.collectClassLoading},
-		{"runtime", c.collectRuntime},
-		{"bolt", c.collectBolt},
-		{"checkpointing", c.collectCheckpointing},
-		{"cypher", c.collectCypher},
-		{"page_cache", c.collectPageCacheDetailed},
-		{"transactions", c.collectTransactionDetailed},
-		{"log_rotation", c.collectLogRotation},
-		{"store_size", c.collectStoreSizeDetailed},
-		{"query_execution", c.collectQueryExecution},
-		{"server", c.collectServer},
-		{"indexes", c.collectIndexes},
-		{"pools", c.collectPools},
-		{"gds", c.collectGDS},
-		{"heavy_tx", c.collectHeavyTransactions},
-		{"synthetic", c.collectSynthetic},
+		{"jmx", c.collectJMX, true},
+		{"nio_buffers", c.collectNIOBufferPools, false},
+		{"threading", c.collectThreading, false},
+		{"classloading", c.collectClassLoading, false},
+		{"runtime", c.collectRuntime, false},
+		{"bolt", c.collectBolt, true},
+		{"checkpointing", c.collectCheckpointing, true},
+		{"cypher", c.collectCypher, true},
+		{"page_cache", c.collectPageCacheDetailed, true},
+		{"transactions", c.collectTransactionDetailed, true},
+		{"log_rotation", c.collectLogRotation, true},
+		{"store_size", c.collectStoreSizeDetailed, true},
+		{"query_execution", c.collectQueryExecution, true},
+		{"server", c.collectServer, true},
+		{"indexes", c.collectIndexes, true},
+		{"pools", c.collectPools, true},
+		{"gds", c.collectGDS, false},
+		{"heavy_tx", c.collectHeavyTransactions, false},
+		{"synthetic", c.collectSynthetic, false},
 	}
 
+	skipped := 0
 	for _, nc := range collectors {
+		if nc.needsEnterprise && !c.isEnterprise {
+			skipped++
+			continue
+		}
 		wg.Add(1)
 		go func(nc namedCollector) {
 			defer wg.Done()
@@ -465,6 +525,11 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 				time.Since(phaseStart).Seconds(), append(targetLabel, nc.name)...,
 			)
 		}(nc)
+	}
+
+	if skipped > 0 {
+		slog.Info("enterprise-only metrics skipped (community edition detected)",
+			"target", c.target, "skipped", skipped)
 	}
 
 	wg.Wait()
@@ -1152,11 +1217,11 @@ func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prom
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, `
-		SHOW TRANSACTIONS
-		WHERE elapsedTime.milliseconds > 5000
-		RETURN count(*) AS heavy_count, sum(pageFaults) AS total_faults
-	`, nil)
+	heavyTxQuery := "SHOW TRANSACTIONS " +
+		"YIELD transactionId, elapsedTime, pageFaults " +
+		"WHERE elapsedTime.milliseconds > 5000 " +
+		"RETURN count(*) AS heavy_count, sum(pageFaults) AS total_faults"
+	result, err := session.Run(ctx, heavyTxQuery, nil)
 	if err != nil {
 		slog.Warn("heavy transactions query failed", "err", err)
 		return

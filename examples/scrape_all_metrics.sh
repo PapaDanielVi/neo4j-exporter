@@ -56,7 +56,11 @@ done
 echo "Waiting additional 10s for Bolt protocol to be ready..."
 sleep 10
 
-echo "=== Step 3: Starting neo4j-exporter ==="
+echo "=== Step 3: Detecting Neo4j version ==="
+NEO4J_VERSION=$(docker exec neo4j-exporter-test cypher-shell -u neo4j -p testpassword123 "CALL dbms.components() YIELD versions, edition RETURN versions[0] AS version, edition" --format plain 2>/dev/null | tail -1 | tr -d '[:space:]' || echo "unknown")
+echo "Detected Neo4j: $NEO4J_VERSION"
+
+echo "=== Step 4: Starting neo4j-exporter ==="
 cd "$PROJECT_DIR"
 ./neo4j-exporter \
   --neo4j.uri=bolt://localhost:7687 \
@@ -69,12 +73,12 @@ echo "Exporter started with PID $EXPORTER_PID"
 echo "Waiting 3s for exporter to start..."
 sleep 3
 
-echo "=== Step 4: Scraping /metrics (standalone mode) ==="
+echo "=== Step 5: Scraping /metrics (standalone mode) ==="
 {
   echo "=============================================="
   echo "  neo4j-exporter — All Metrics Snapshot"
   echo "  Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-  echo "  Neo4j: 5.26-community"
+  echo "  Neo4j: ${NEO4J_VERSION}"
   echo "  Mode: standalone (/metrics)"
   echo "=============================================="
   echo ""
@@ -82,7 +86,7 @@ echo "=== Step 4: Scraping /metrics (standalone mode) ==="
 } > "$OUTPUT_FILE"
 
 echo ""
-echo "=== Step 5: Scraping /scrape (proxy mode) ==="
+echo "=== Step 6: Scraping /scrape (proxy mode) ==="
 {
   echo ""
   echo "=============================================="
