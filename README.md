@@ -197,4 +197,4 @@ go test -race ./...
 
 ## License
 
-Apache 2.0
+MIT License
