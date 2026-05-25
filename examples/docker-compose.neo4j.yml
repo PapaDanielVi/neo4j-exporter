@@ -1,0 +1,26 @@
+services:
+  neo4j:
+    image: ${NEO4J_IMAGE:-neo4j:5.26-community}
+    container_name: neo4j-exporter-test
+    environment:
+      NEO4J_AUTH: neo4j/testpassword123
+    ports:
+      - "7687:7687" # Bolt
+      - "7474:7474" # HTTP / Browser
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  neo4j_data:
+  neo4j_logs:

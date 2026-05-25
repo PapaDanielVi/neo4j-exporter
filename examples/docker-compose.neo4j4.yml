@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  neo4j4:
+    image: neo4j:4.4-community
+    container_name: neo4j4-exporter-test
+    environment:
+      NEO4J_AUTH: neo4j/testpassword123
+    ports:
+      - "7688:7687" # Bolt on different port to avoid conflict
+      - "7475:7474" # HTTP on different port
+    volumes:
+      - neo4j4_data:/data
+      - neo4j4_logs:/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  neo4j4_data:
+  neo4j4_logs:

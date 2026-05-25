@@ -33,3 +33,4 @@ go.work.sum
 
 *PLAN.md
 /neo4j-exporter
+examples/all_metrics_*.txt

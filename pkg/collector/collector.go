@@ -19,9 +19,8 @@ type Collector struct {
 	target string
 
 	// Exporter self-metrics
-	up               *prometheus.Desc
-	scrapeDuration   *prometheus.Desc
-	driverPoolActive *prometheus.Desc
+	up             *prometheus.Desc
+	scrapeDuration *prometheus.Desc
 
 	// ── Core JMX (existing) ──────────────────────────────────────────
 	nodeCount        *prometheus.Desc
@@ -195,8 +194,6 @@ func New(target string, driver neo4j.DriverWithContext) *Collector {
 			"1 if target Neo4j instance is reachable, else 0", labels, nil),
 		scrapeDuration: prometheus.NewDesc(ns+"_exporter_scrape_duration_seconds",
 			"Latency of scrape phases", append(labels, "phase"), nil),
-		driverPoolActive: prometheus.NewDesc(ns+"_exporter_driver_pool_active",
-			"Number of cached active database connection drivers", nil, nil),
 
 		// ── Core JMX ──────────────────────────────────────────────
 		nodeCount:        prometheus.NewDesc(ns+"_database_count_node", "Number of node IDs in use", labels, nil),
@@ -369,7 +366,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 
 func (c *Collector) allDescs() []*prometheus.Desc {
 	return []*prometheus.Desc{
-		c.up, c.scrapeDuration, c.driverPoolActive,
+		c.up, c.scrapeDuration,
 		c.nodeCount, c.relCount, c.propCount,
 		c.txCommitted, c.txRolledBack, c.txActive,
 		c.pageCacheHits, c.pageCacheFaults, c.pageCacheFlushes, c.storeSize,
@@ -541,7 +538,7 @@ func (c *Collector) jmxQueryMulti(ctx context.Context, ch chan<- prometheus.Metr
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes", nil)
+		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes", map[string]any{"mbean": mbean})
 	if err != nil {
 		slog.Warn("JMX multi query failed", "mbean", mbean, "err", err)
 		return
@@ -603,7 +600,8 @@ func (c *Collector) collectJVMPools(ctx context.Context, ch chan<- prometheus.Me
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.lang:type=MemoryPool,name=*') YIELD name, attributes RETURN name, attributes['Usage.used'] AS used", nil)
+		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes['Usage.used'] AS used",
+			map[string]any{"mbean": "java.lang:type=MemoryPool,name=*"})
 	if err != nil {
 		slog.Warn("JVM pool query failed", "err", err)
 		return
@@ -633,7 +631,8 @@ func (c *Collector) collectJVMGC(ctx context.Context, ch chan<- prometheus.Metri
 
 	// GC time
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.lang:type=GarbageCollector,name=*') YIELD name, attributes RETURN name, attributes['CollectionTime'] AS time, attributes['CollectionCount'] AS count", nil)
+		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes['CollectionTime'] AS time, attributes['CollectionCount'] AS count",
+			map[string]any{"mbean": "java.lang:type=GarbageCollector,name=*"})
 	if err != nil {
 		slog.Warn("JVM GC query failed", "err", err)
 		return
@@ -664,7 +663,8 @@ func (c *Collector) collectJVMGC(ctx context.Context, ch chan<- prometheus.Metri
 
 	// Heap metrics
 	heapResult, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.lang:type=Memory') YIELD attributes RETURN attributes['HeapMemoryUsage'] AS heap", nil)
+		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes['HeapMemoryUsage'] AS heap",
+			map[string]any{"mbean": "java.lang:type=Memory"})
 	if err != nil {
 		slog.Warn("JVM heap query failed", "err", err)
 		return
@@ -692,7 +692,8 @@ func (c *Collector) collectJVMGC(ctx context.Context, ch chan<- prometheus.Metri
 
 	// Process CPU load
 	cpuResult, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.lang:type=OperatingSystem') YIELD attributes RETURN attributes['ProcessCpuLoad'] AS cpu", nil)
+		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes['ProcessCpuLoad'] AS cpu",
+			map[string]any{"mbean": "java.lang:type=OperatingSystem"})
 	if err != nil {
 		return
 	}
@@ -724,7 +725,8 @@ func (c *Collector) collectNIOBufferPools(ctx context.Context, ch chan<- prometh
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.nio:type=BufferPool,name=*') YIELD name, attributes RETURN name, attributes", nil)
+		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes",
+			map[string]any{"mbean": "java.nio:type=BufferPool,name=*"})
 	if err != nil {
 		slog.Warn("NIO buffer pool query failed", "err", err)
 		return
@@ -790,7 +792,8 @@ func (c *Collector) collectRuntime(ctx context.Context, ch chan<- prometheus.Met
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
 	defer session.Close(ctx)
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx('java.lang:type=Runtime') YIELD attributes RETURN attributes['Uptime'] AS uptime", nil)
+		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes['Uptime'] AS uptime",
+			map[string]any{"mbean": "java.lang:type=Runtime"})
 	if err != nil {
 		return
 	}
@@ -945,13 +948,13 @@ func (c *Collector) collectStoreSizeDetailed(ctx context.Context, ch chan<- prom
 func (c *Collector) collectQueryExecution(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
 	// Query metrics are per-database; query from system database
 	queryCypher := `
-		CALL dbms.queryJmx('neo4j.metrics:database=system,name=Query Execution')
+		CALL dbms.queryJmx($mbean)
 		YIELD attributes RETURN attributes
 	`
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
 	defer session.Close(ctx)
 
-	result, err := session.Run(ctx, queryCypher, nil)
+	result, err := session.Run(ctx, queryCypher, map[string]any{"mbean": "neo4j.metrics:database=system,name=Query Execution"})
 	if err != nil {
 		// Query execution metrics may not be available in all editions
 		slog.Debug("query execution JMX query failed", "err", err)
@@ -1025,7 +1028,8 @@ func (c *Collector) collectPools(ctx context.Context, ch chan<- prometheus.Metri
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx('org.neo4j:instance=0,name=* Pool') YIELD name, attributes RETURN name, attributes", nil)
+		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes",
+			map[string]any{"mbean": "org.neo4j:instance=0,name=* Pool"})
 	if err != nil {
 		slog.Debug("pools query failed", "err", err)
 		return
@@ -1182,7 +1186,7 @@ func (c *Collector) collectSynthetic(ctx context.Context, ch chan<- prometheus.M
 	start := time.Now()
 	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
 	defer session.Close(ctx)
-	_, err := session.Run(ctx, "RETURN 1", nil)
+	_, err := session.Run(ctx, "CALL dbms.components() YIELD name RETURN name LIMIT 1", nil)
 	if err != nil {
 		slog.Warn("synthetic query failed", "err", err)
 		return

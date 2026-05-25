@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -172,6 +173,9 @@ func main() {
 
 	// Start server
 	addr := cfg.ListenAddress
+		if !strings.Contains(addr, ":") {
+			addr = ":" + addr
+		}
 	slog.Info("listening", "address", addr)
 
 	var wg sync.WaitGroup
