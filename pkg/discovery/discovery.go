@@ -1,3 +1,4 @@
+// Package discovery provides functionality to discover Neo4j databases and generate Prometheus scrape targets for them.
 package discovery
 
 import (

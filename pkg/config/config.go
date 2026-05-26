@@ -1,3 +1,4 @@
+// Package config handles command-line flags and environment variables for the neo4j-exporter.
 package config
 
 import (

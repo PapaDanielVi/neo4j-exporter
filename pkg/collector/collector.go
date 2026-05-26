@@ -1,3 +1,4 @@
+// Package collector implements a Prometheus collector for Neo4j metrics, including JVM and GDS stats via JMX.
 package collector
 
 import (
