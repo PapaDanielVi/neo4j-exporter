@@ -34,7 +34,7 @@ formatters:
       # with the given prefixes are grouped after 3rd-party packages.
       # Default: []
       local-prefixes:
-        - github.com/PapaDanielVi/secret-shift
+        - github.com/PapaDanielVi/neo4j-exporter
 
     golines:
       # Target maximum line length.
