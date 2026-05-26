@@ -229,6 +229,8 @@ linters:
       # Such cases aren't reported by default.
       # Default: false
       check-type-assertions: true
+      exclude-functions:
+        - (github.com/neo4j/neo4j-go-driver/v5/neo4j.SessionWithContext).Close
 
     exhaustive:
       # Program elements to check for exhaustiveness.
@@ -443,27 +445,9 @@ linters:
     rules:
       - text: 'should have a package comment'
         linters: [ revive ]
-      - text: 'exported \S+ \S+ should have comment( \(or a comment on this block\))? or be unexported'
-        linters: [ revive ]
-      - path: '_test\.go'
-        linters:
-          - bodyclose
-          - dupl
-          - errcheck
-          - funlen
-          - goconst
-          - gosec
-          - noctx
-          - wrapcheck
-          - paralleltest
-          - usetesting
       - path: 'cmd/'
         linters:
           - forbidigo
           - gochecknoinits
           - gochecknoglobals
           - revive
-      - path: '.'
-        linters:
-          - recvcheck
-          - testpackage

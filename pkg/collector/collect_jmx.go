@@ -4,19 +4,18 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ── NIO Buffer Pools ───────────────────────────────────────────────
 
 func (c *Collector) collectNIOBufferPools(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
+	session := c.driver.NewSession(ctx, systemSessionCfg())
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
 		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes",
-		map[string]any{"mbean": "java.nio:type=BufferPool,name=*"})
+		map[string]any{jmxMBeanParam: nioBufferPoolMBean})
 	if err != nil {
 		slog.Warn("NIO buffer pool query failed", "err", err)
 		return
@@ -36,7 +35,9 @@ func (c *Collector) collectNIOBufferPools(ctx context.Context, ch chan<- prometh
 		if !ok {
 			continue
 		}
-		poolLabels := append(labels, poolName)
+		poolLabels := make([]string, len(labels)+1)
+		copy(poolLabels, labels)
+		poolLabels[len(labels)] = poolName
 		for attr, desc := range map[string]*prometheus.Desc{
 			"MemoryUsed":    c.bufferPoolUsed,
 			"TotalCapacity": c.bufferPoolCapacity,
@@ -79,7 +80,7 @@ func (c *Collector) collectClassLoading(ctx context.Context, ch chan<- prometheu
 // ── Runtime (uptime) ───────────────────────────────────────────────
 
 func (c *Collector) collectRuntime(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
+	session := c.driver.NewSession(ctx, systemSessionCfg())
 	defer session.Close(ctx)
 	result, err := session.Run(ctx,
 		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes['Uptime'] AS uptime",

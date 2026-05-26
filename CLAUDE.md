@@ -83,13 +83,13 @@ golangci-lint run
 
 ### Entry Point
 
-`cmd/neo4j-exporter/main.go` — parses CLI flags, creates driver pool, optionally loads Lua engine and custom YAML queries, registers HTTP handlers, starts server (default `:9121`).
+`cmd/neo4j-exporter/main.go` — parses CLI flags, creates driver pool, optionally loads Lua engine and custom YAML queries, registers HTTP handlers, starts server (default `:9121`). Setup logic is extracted into helper functions (`setupLogger`, `setupHandlers`, `setupStandaloneCollector`, `serve`) to keep `main()` readable.
 
 ### Package Layout
 
 | Package           | Purpose                                                                                                                                                                                                               |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pkg/collector/`  | Core Prometheus collector (`Describe` + `Collect`). Spawns ~20 goroutines in parallel per scrape — one per metric group (JMX, NIO, Bolt, page cache, transactions, etc.). 10s scrape timeout, 2s transaction timeout. |
+| `pkg/collector/`  | Core Prometheus collector (`Describe` + `Collect`). Spawns ~7 goroutines in parallel per scrape — one per metric group (NIO, threading, class loading, runtime, GDS, heavy transactions, synthetic canary). 10s scrape timeout. |
 | `pkg/config/`     | CLI flag and env var parsing via kingpin                                                                                                                                                                              |
 | `pkg/driverpool/` | Thread-safe cached Neo4j driver pool with double-checked locking. Background reaper evicts idle drivers after 5 min. Max 5 connections per driver.                                                                    |
 | `pkg/discovery/`  | Runs `SHOW DATABASES` on system DB, returns HTTP_SD targets                                                                                                                                                           |
@@ -97,9 +97,11 @@ golangci-lint run
 
 ### Key Patterns
 
-- **JMX queries**: `jmxQuery()` (single attribute) and `jmxQueryMulti()` (multiple attributes) via `dbms.queryJmx()` Cypher procedure. `jmxValue()` safely extracts float64 from int64, float64, or nested `{"value": ...}` maps.
+- **JMX queries**: `jmxQueryMulti()` (multiple attributes) via `dbms.queryJmx()` Cypher procedure. `jmxValue()` safely extracts float64 from int64, float64, or nested `{"value": ...}` maps.
+- **Session configs**: Predefined `readSessionCfg()` and `systemSessionCfg()` functions in `pkg/collector/collector.go` avoid repeated struct literals. Constants `jmxQueryAllAttrs`, `nioBufferPoolMBean`, `jmxMBeanParam`, and `systemDatabase` eliminate repeated string literals.
 - **Custom YAML metrics**: Defined in a YAML file with query, metric_name, type, help, labels. Loaded via `LoadCustomQueries()` in `pkg/collector/custom.go`.
 - **Password handling**: Passwords are read from files (`--neo4j.password-file`), never from CLI flags or env vars directly.
+- **GDS metrics**: `collectGDS()` calls `gds.systemMonitor()` and `gds.memory.summary()`. When `Single()` fails for memory summary (multi-user), it falls back to `Collect()` and sums per-user rows via `emitMemoryMetrics()`.
 
 ### CI/CD
 
@@ -111,19 +113,7 @@ golangci-lint run
 
 - `examples/custom_queries.yaml` — example YAML custom queries
 - `examples/custom_logic.lua` — example Lua custom metric script
-
-
-
-# CLAUDE.md
-
-This file provides high-level guidance to Claude Code.
-
-## Project Overview
-
-Money is Snapp's main backend service that handles passengers/drivers wallets, money transfers, and tracks all financial transactions. It's built with the Echo web framework and integrates with multiple banks and internal Snapp services.
-
-Key integrations: MySQL, PostgreSQL, Redis, NATS, RabbitMQ, and various bank SDKs.
-
-## Persistent Context & Rules Update Protocol
-
-When new information or project requirements are established, proactively update the relevant Markdown files in `.claude/contexts/` and `.claude/rules/` to ensure long-term persistence and alignment across sessions.
+- `examples/grafana-dashboard.json` — pre-built Grafana dashboard for Neo4j metrics
+- `examples/docker-compose.neo4j.yml` — Docker Compose with Neo4j 5.x
+- `examples/docker-compose.neo4j4.yml` — Docker Compose with Neo4j 4.x
+- `examples/metrics_analysis.md` — analysis of which JMX metrics work on Neo4j 5.x

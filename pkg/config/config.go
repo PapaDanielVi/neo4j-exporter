@@ -12,9 +12,9 @@ type Config struct {
 	// Listen address for the exporter HTTP server
 	ListenAddress string
 	// Neo4j connection
-	Neo4jURI      string
-	Neo4jUser     string
-	Neo4jPassword string
+	Neo4jURI          string
+	Neo4jUser         string
+	Neo4jPassword     string
 	Neo4jPasswordFile string
 	// Service discovery
 	SDPrimaryURI string

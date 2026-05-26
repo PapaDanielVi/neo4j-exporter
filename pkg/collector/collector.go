@@ -11,7 +11,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const scrapeTimeout = 10 * time.Second
+const (
+	scrapeTimeout      = 10 * time.Second
+	systemDatabase     = "system"
+	jmxQueryAllAttrs   = "CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes"
+	nioBufferPoolMBean = "java.nio:type=BufferPool,name=*"
+	jmxMBeanParam      = "mbean"
+)
+
+func readSessionCfg() neo4j.SessionConfig {
+	return neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead}
+}
+
+func systemSessionCfg() neo4j.SessionConfig {
+	return neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: systemDatabase}
+}
 
 // Collector implements prometheus.Collector for Neo4j metrics.
 type Collector struct {
@@ -108,7 +122,7 @@ func (c *Collector) DetectVersion(ctx context.Context) {
 		return
 	}
 
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
+	session := c.driver.NewSession(ctx, systemSessionCfg())
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx, "CALL dbms.components() YIELD versions RETURN versions", nil)
@@ -245,11 +259,11 @@ func (c *Collector) jmxQueryMulti(ctx context.Context, ch chan<- prometheus.Metr
 		mtype prometheus.ValueType
 	},
 ) {
-	session := c.driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
+	session := c.driver.NewSession(ctx, systemSessionCfg())
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes", map[string]any{"mbean": mbean})
+		jmxQueryAllAttrs, map[string]any{jmxMBeanParam: mbean})
 	if err != nil {
 		slog.Warn("JMX multi query failed", "mbean", mbean, "err", err)
 		return
