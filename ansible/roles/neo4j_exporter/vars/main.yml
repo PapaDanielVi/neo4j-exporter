@@ -1,0 +1,15 @@
+---
+# Role-specific variables (not meant to be overridden)
+# Derived variables and internal constants
+
+# Binary filename based on architecture
+neo4j_exporter_binary_name: neo4j-exporter
+
+# Service name
+neo4j_exporter_systemd_service_name: "{{ neo4j_exporter_service_name }}.service"
+
+# Binary architecture detection
+neo4j_exporter_arch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: arm

@@ -1,0 +1,104 @@
+---
+# Binary deployment tasks for neo4j-exporter
+
+- name: Create neo4j-exporter user
+  ansible.builtin.user:
+    name: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    shell: /usr/sbin/nologin
+    system: true
+    create_home: false
+    state: present
+
+- name: Create installation directory
+  ansible.builtin.file:
+    path: "{{ neo4j_exporter_install_dir }}"
+    state: directory
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0755'
+
+- name: Download neo4j-exporter archive
+  ansible.builtin.get_url:
+    url: "{{ neo4j_exporter_binary_url }}"
+    dest: /tmp/neo4j-exporter.tar.gz
+    checksum: "{{ neo4j_exporter_checksum }}"
+    mode: '0644'
+    timeout: 120
+  register: neo4j_exporter_download_result
+  retries: 3
+  delay: 5
+  until: neo4j_exporter_download_result is succeeded
+  notify: Restart neo4j-exporter service
+
+- name: Extract neo4j-exporter binary
+  ansible.builtin.unarchive:
+    src: /tmp/neo4j-exporter.tar.gz
+    dest: "{{ neo4j_exporter_install_dir }}"
+    remote_src: true
+    creates: "{{ neo4j_exporter_install_dir }}/neo4j-exporter"
+  notify: Restart neo4j-exporter service
+
+- name: Remove downloaded archive
+  ansible.builtin.file:
+    path: /tmp/neo4j-exporter.tar.gz
+    state: absent
+
+- name: Set binary permissions
+  ansible.builtin.file:
+    path: "{{ neo4j_exporter_install_dir }}/neo4j-exporter"
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0755'
+
+- name: Create configuration directory
+  ansible.builtin.file:
+    path: /etc/neo4j-exporter
+    state: directory
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0700'
+
+- name: Setup Neo4j password file
+  ansible.builtin.copy:
+    content: "{{ neo4j_exporter_neo4j_password }}\n"
+    dest: "{{ neo4j_exporter_neo4j_password_file }}"
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0600'
+  when: neo4j_exporter_neo4j_password is defined
+  notify: Restart neo4j-exporter service
+
+- name: Deploy custom queries file
+  ansible.builtin.template:
+    src: custom_queries.yaml.j2
+    dest: "{{ neo4j_exporter_install_dir }}/custom_queries.yaml"
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0644'
+  when: neo4j_exporter_custom_queries is defined
+  notify: Restart neo4j-exporter service
+
+- name: Deploy Lua scripts directory
+  ansible.builtin.copy:
+    src: "{{ neo4j_exporter_lua_scripts_dir }}/"
+    dest: "{{ neo4j_exporter_install_dir }}/lua/"
+    owner: "{{ neo4j_exporter_user }}"
+    group: "{{ neo4j_exporter_group }}"
+    mode: '0644'
+    directory_mode: '0755'
+  when: neo4j_exporter_lua_scripts_dir is defined
+  notify: Restart neo4j-exporter service
+
+- name: Deploy systemd service unit
+  ansible.builtin.template:
+    src: neo4j-exporter.service.j2
+    dest: /etc/systemd/system/{{ neo4j_exporter_service_name }}.service
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Ensure neo4j-exporter service is enabled and started
+  ansible.builtin.systemd:
+    name: "{{ neo4j_exporter_service_name }}"
+    enabled: true
+    state: started

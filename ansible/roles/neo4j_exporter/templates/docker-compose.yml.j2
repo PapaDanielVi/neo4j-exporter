@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  neo4j-exporter:
+    image: {{ neo4j_exporter_docker_image }}
+    container_name: {{ neo4j_exporter_docker_container_name }}
+    restart: {{ neo4j_exporter_docker_restart_policy }}
+    ports:
+      - "9121:9121"
+    environment:
+      NEO4J_URI: {{ neo4j_exporter_neo4j_uri }}
+      NEO4J_USER: {{ neo4j_exporter_neo4j_user }}
+      NEO4J_PASSWORD: {{ neo4j_exporter_neo4j_password }}
+      NEO4J_EXPORTER_LISTEN_ADDRESS: {{ neo4j_exporter_listen_address | regex_replace('^:', '') }}
+      NEO4J_EXPORTER_LOG_JSON: "{{ 'true' if neo4j_exporter_log_json else 'false' }}"
+    volumes:
+{% if neo4j_exporter_custom_queries_file is defined %}
+      - ./custom_queries.yaml:/config/custom_queries.yaml:ro
+{% endif %}
+{% if neo4j_exporter_lua_scripts_dir is defined %}
+      - ./lua:/lua:ro
+{% endif %}
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--timeout=2", "-O-", "http://localhost:9121/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

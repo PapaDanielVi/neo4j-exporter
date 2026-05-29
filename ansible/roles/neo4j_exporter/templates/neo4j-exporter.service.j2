@@ -1,0 +1,28 @@
+[Unit]
+Description=Neo4j Prometheus Exporter
+Documentation=https://github.com/PapaDanielVi/neo4j-exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ neo4j_exporter_user }}
+Group={{ neo4j_exporter_group }}
+ExecStart={{ neo4j_exporter_install_dir }}/{{ neo4j_exporter_binary_name }} --web.listen-address={{ neo4j_exporter_listen_address | regex_replace('^:', '') }} --neo4j.uri={{ neo4j_exporter_neo4j_uri }} --neo4j.user={{ neo4j_exporter_neo4j_user }} --neo4j.password-file={{ neo4j_exporter_neo4j_password_file }}{% if neo4j_exporter_sd_primary_uri is defined %} --sd.primary-uri={{ neo4j_exporter_sd_primary_uri }}{% endif %}{% if neo4j_exporter_log_json %} --log.json{% endif %}
+Restart={{ neo4j_exporter_systemd_restart }}
+RestartSec={{ neo4j_exporter_systemd_restart_sec }}
+StartLimitIntervalSec={{ neo4j_exporter_systemd_start_limit_interval }}
+StartLimitBurst={{ neo4j_exporter_systemd_start_limit_burst }}
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths={{ neo4j_exporter_install_dir }} /etc/neo4j-exporter
+ReadOnlyPaths=/etc/ssl/certs
+
+# Resource limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
