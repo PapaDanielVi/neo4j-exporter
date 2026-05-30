@@ -40,3 +40,4 @@ ansible/group_vars/*/vault.yml
 ansible/inventory.ini.local
 ansible/.vault_pass.txt
 ansible/.ansible
+*.tar.gz
