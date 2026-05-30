@@ -98,45 +98,45 @@ services:
 
 ### NIO Buffer Pools
 
-| Metric                                  | Type  | Labels | Description                     |
-| --------------------------------------- | ----- | ------ | ------------------------------- |
-| `neo4j_jvm_buffer_pool_used_bytes`      | Gauge | pool   | Off-heap buffer pool used bytes |
-| `neo4j_jvm_buffer_pool_capacity_bytes`  | Gauge | pool   | Off-heap buffer pool capacity   |
-| `neo4j_jvm_buffer_pool_count`           | Gauge | pool   | Number of buffers in pool       |
+| Metric                                 | Type  | Labels | Description                     |
+| -------------------------------------- | ----- | ------ | ------------------------------- |
+| `neo4j_jvm_buffer_pool_used_bytes`     | Gauge | pool   | Off-heap buffer pool used bytes |
+| `neo4j_jvm_buffer_pool_capacity_bytes` | Gauge | pool   | Off-heap buffer pool capacity   |
+| `neo4j_jvm_buffer_pool_count`          | Gauge | pool   | Number of buffers in pool       |
 
 ### JVM Threading
 
-| Metric                        | Type  | Description          |
-| ----------------------------- | ----- | -------------------- |
-| `neo4j_jvm_threads_peak`      | Gauge | Peak thread count    |
-| `neo4j_jvm_threads_daemon`    | Gauge | Daemon thread count  |
-| `neo4j_jvm_threads_total`     | Gauge | Total live threads   |
+| Metric                     | Type  | Description         |
+| -------------------------- | ----- | ------------------- |
+| `neo4j_jvm_threads_peak`   | Gauge | Peak thread count   |
+| `neo4j_jvm_threads_daemon` | Gauge | Daemon thread count |
+| `neo4j_jvm_threads_total`  | Gauge | Total live threads  |
 
 ### JVM Class Loading
 
-| Metric                              | Type    | Description            |
-| ----------------------------------- | ------- | ---------------------- |
-| `neo4j_jvm_classes_loaded`          | Gauge   | Currently loaded classes |
-| `neo4j_jvm_classes_unloaded_total`  | Counter | Total unloaded classes |
+| Metric                             | Type    | Description              |
+| ---------------------------------- | ------- | ------------------------ |
+| `neo4j_jvm_classes_loaded`         | Gauge   | Currently loaded classes |
+| `neo4j_jvm_classes_unloaded_total` | Counter | Total unloaded classes   |
 
 ### JVM Runtime
 
-| Metric                       | Type  | Description         |
-| ---------------------------- | ----- | ------------------- |
-| `neo4j_jvm_uptime_seconds`   | Gauge | JVM uptime seconds  |
+| Metric                     | Type  | Description        |
+| -------------------------- | ----- | ------------------ |
+| `neo4j_jvm_uptime_seconds` | Gauge | JVM uptime seconds |
 
 ### GDS — Graph Data Science
 
-| Metric                                          | Type  | Labels | Description                            |
-| ----------------------------------------------- | ----- | ------ | -------------------------------------- |
-| `neo4j_gds_jvm_free_heap_bytes`                 | Gauge |        | Free JVM heap from GDS system monitor  |
-| `neo4j_gds_jvm_total_heap_bytes`                | Gauge |        | Total JVM heap from GDS system monitor |
-| `neo4j_gds_jvm_max_heap_bytes`                  | Gauge |        | Max JVM heap from GDS system monitor   |
-| `neo4j_gds_jvm_available_cpu_cores`             | Gauge |        | Logical CPU cores available to JVM     |
-| `neo4j_gds_available_cpu_cores_not_requested`   | Gauge |        | CPU cores not requested by GDS         |
-| `neo4j_gds_ongoing_procedures`                  | Gauge |        | Currently running GDS procedures       |
-| `neo4j_gds_graph_memory_bytes`                  | Gauge |        | Memory used by GDS projected graphs    |
-| `neo4j_gds_task_memory_bytes`                   | Gauge |        | Memory estimated for running GDS tasks |
+| Metric                                        | Type  | Labels | Description                            |
+| --------------------------------------------- | ----- | ------ | -------------------------------------- |
+| `neo4j_gds_jvm_free_heap_bytes`               | Gauge |        | Free JVM heap from GDS system monitor  |
+| `neo4j_gds_jvm_total_heap_bytes`              | Gauge |        | Total JVM heap from GDS system monitor |
+| `neo4j_gds_jvm_max_heap_bytes`                | Gauge |        | Max JVM heap from GDS system monitor   |
+| `neo4j_gds_jvm_available_cpu_cores`           | Gauge |        | Logical CPU cores available to JVM     |
+| `neo4j_gds_available_cpu_cores_not_requested` | Gauge |        | CPU cores not requested by GDS         |
+| `neo4j_gds_ongoing_procedures`                | Gauge |        | Currently running GDS procedures       |
+| `neo4j_gds_graph_memory_bytes`                | Gauge |        | Memory used by GDS projected graphs    |
+| `neo4j_gds_task_memory_bytes`                 | Gauge |        | Memory estimated for running GDS tasks |
 
 ### Advanced Metrics
 
@@ -316,19 +316,19 @@ ansible-playbook playbook.yml -e "neo4j_exporter_deployment_method=docker"
 
 ### Configuration Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `neo4j_exporter_deployment_method` | `binary` | Deployment method: `binary` or `docker` |
-| `neo4j_exporter_install_dir` | `/opt/neo4j-exporter` | Installation directory for binary |
-| `neo4j_exporter_binary_url` | GitHub releases URL | URL to download the binary |
-| `neo4j_exporter_listen_address` | `:9121` | HTTP listen address |
-| `neo4j_exporter_neo4j_uri` | `bolt://localhost:7687` | Neo4j Bolt URI |
-| `neo4j_exporter_neo4j_user` | `neo4j` | Neo4j username |
-| `neo4j_exporter_neo4j_password` | `null` | Neo4j password (use vault) |
-| `neo4j_exporter_neo4j_password_file` | `/etc/neo4j-exporter/password` | Password file path |
-| `neo4j_exporter_sd_primary_uri` | `null` | Primary URI for service discovery |
-| `neo4j_exporter_log_json` | `false` | Enable JSON logging |
-| `neo4j_exporter_docker_image` | `ghcr.io/PapaDanielVi/neo4j-exporter:latest` | Docker image for container deployment |
+| Variable                             | Default                                      | Description                             |
+| ------------------------------------ | -------------------------------------------- | --------------------------------------- |
+| `neo4j_exporter_deployment_method`   | `binary`                                     | Deployment method: `binary` or `docker` |
+| `neo4j_exporter_install_dir`         | `/opt/neo4j-exporter`                        | Installation directory for binary       |
+| `neo4j_exporter_binary_url`          | GitHub releases URL                          | URL to download the binary              |
+| `neo4j_exporter_listen_address`      | `:9121`                                      | HTTP listen address                     |
+| `neo4j_exporter_neo4j_uri`           | `bolt://localhost:7687`                      | Neo4j Bolt URI                          |
+| `neo4j_exporter_neo4j_user`          | `neo4j`                                      | Neo4j username                          |
+| `neo4j_exporter_neo4j_password`      | `null`                                       | Neo4j password (use vault)              |
+| `neo4j_exporter_neo4j_password_file` | `/etc/neo4j-exporter/password`               | Password file path                      |
+| `neo4j_exporter_sd_primary_uri`      | `null`                                       | Primary URI for service discovery       |
+| `neo4j_exporter_log_json`            | `false`                                      | Enable JSON logging                     |
+| `neo4j_exporter_docker_image`        | `ghcr.io/PapaDanielVi/neo4j-exporter:latest` | Docker image for container deployment   |
 
 ### Expected Outcomes
 
