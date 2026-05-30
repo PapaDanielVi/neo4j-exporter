@@ -1,3 +1,5 @@
+version: 2
+
 project_name: neo4j-exporter
 
 before:
@@ -7,6 +9,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    main: cmd/neo4j-exporter/main.go
     goos:
       - linux
       - darwin
