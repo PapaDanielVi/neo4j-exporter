@@ -9,7 +9,7 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-    main: cmd/neo4j-exporter/main.go
+    main: ./cmd/neo4j-exporter
     goos:
       - linux
       - darwin
@@ -34,32 +34,21 @@ archives:
       - goos: windows
         format: zip
 
-dockers:
-  - image_templates:
-      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-amd64"
-      - "ghcr.com/papadanielvi/neo4j-exporter:latest-amd64"
-    dockerfile: Dockerfile
-    use: buildx
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - "--platform=linux/amd64"
-  - image_templates:
-      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-arm64"
-      - "ghcr.com/papadanielvi/neo4j-exporter:latest-arm64"
-    dockerfile: Dockerfile
-    use: buildx
-    goos: linux
-    goarch: arm64
-    build_flag_templates:
-      - "--platform=linux/arm64"
+brews:
+  - repository:
+      owner: PapaDanielVi
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
 
-docker_manifests:
-  - name_template: "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}"
-    image_templates:
-      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-amd64"
-      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-arm64"
-  - name_template: "ghcr.com/papadanielvi/neo4j-exporter:latest"
-    image_templates:
-      - "ghcr.com/papadanielvi/neo4j-exporter:latest-amd64"
-      - "ghcr.com/papadanielvi/neo4j-exporter:latest-arm64"
+    directory: Formula
+
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    homepage: "https://github.com/PapaDanielVi/neo4j-exporter"
+    description: "Prometheus exporter for Neo4j graph databases."
+    license: "MIT"
+
+    test: |
+      system "#{bin}/neo4j-exporter --version"
