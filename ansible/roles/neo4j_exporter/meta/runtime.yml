@@ -29,5 +29,4 @@ galaxy_info:
     - neo4j
     - exporter
 
-dependencies: []
 requires_ansible: ">=2.20.6"
