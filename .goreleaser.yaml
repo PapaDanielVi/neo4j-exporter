@@ -19,9 +19,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.buildDate={{.Date}}
+      - -X github.com/PapaDanielVi/neo4j-exporter/cmd/neo4j-exporter.Version={{ .Tag }}.version={{.Version}}
+      - -X github.com/PapaDanielVi/neo4j-exporter/cmd/neo4j-exporter.Version={{ .Tag }}.commit={{.Commit}}
+      - -X github.com/PapaDanielVi/neo4j-exporter/cmd/neo4j-exporter.Version={{ .Tag }}.buildDate={{.Date}}
 
 archives:
   - format: tar.gz
@@ -33,19 +33,6 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
-
-checksum:
-  name_template: "checksums.txt"
-
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
 
 dockers:
   - image_templates:
