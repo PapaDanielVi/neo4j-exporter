@@ -1,0 +1,17 @@
+---
+# Handlers for neo4j_exporter role
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: Reload systemd
+
+- name: Restart neo4j-exporter service
+  ansible.builtin.systemd:
+    name: "{{ neo4j_exporter_service_name }}"
+    state: restarted
+  listen: Restart neo4j-exporter service
+
+- name: Restart neo4j-exporter container
+  ansible.builtin.shell: docker restart {{ neo4j_exporter_docker_container_name }}
+  listen: Restart neo4j-exporter container

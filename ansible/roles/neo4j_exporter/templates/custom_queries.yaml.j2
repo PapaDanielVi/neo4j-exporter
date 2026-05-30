@@ -1,0 +1,4 @@
+# Custom queries configuration for neo4j-exporter
+# This file is managed by Ansible - do not edit manually
+
+custom_queries: {{ neo4j_exporter_custom_queries | to_nice_yaml(indent=2) }}

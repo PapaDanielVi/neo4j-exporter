@@ -1,0 +1,37 @@
+---
+# Default variables for neo4j_exporter role
+# These can be overridden in group_vars, host_vars, or extra-vars
+
+# Deployment method: binary or docker
+neo4j_exporter_deployment_method: binary
+
+# Binary deployment settings
+neo4j_exporter_user: neo4jexporter
+neo4j_exporter_group: neo4jexporter
+neo4j_exporter_install_dir: /opt/neo4j-exporter
+neo4j_exporter_binary_url: https://github.com/PapaDanielVi/neo4j-exporter/releases/latest/download/neo4j-exporter_Linux_x86_64.tar.gz
+neo4j_exporter_checksum: null  # Optional SHA256 checksum for binary verification
+neo4j_exporter_service_name: neo4j-exporter
+
+# Neo4j connection settings
+neo4j_exporter_listen_address: ":9121"
+neo4j_exporter_neo4j_uri: "bolt://localhost:7687"
+neo4j_exporter_neo4j_user: neo4j
+neo4j_exporter_neo4j_password: null  # Required - prefer using password_file
+neo4j_exporter_neo4j_password_file: /etc/neo4j-exporter/password
+neo4j_exporter_sd_primary_uri: null  # Optional - for service discovery
+neo4j_exporter_custom_queries_file: null  # Optional - path to custom queries YAML
+neo4j_exporter_lua_scripts_dir: null  # Optional - path to Lua scripts directory
+neo4j_exporter_log_json: false
+
+# Docker deployment settings
+neo4j_exporter_docker_image: ghcr.io/PapaDanielVi/neo4j-exporter:latest
+neo4j_exporter_docker_container_name: neo4j-exporter
+neo4j_exporter_docker_restart_policy: unless-stopped
+neo4j_exporter_docker_network_mode: bridge
+
+# Systemd service settings
+neo4j_exporter_systemd_restart: always
+neo4j_exporter_systemd_restart_sec: 5
+neo4j_exporter_systemd_start_limit_interval: 60
+neo4j_exporter_systemd_start_limit_burst: 3

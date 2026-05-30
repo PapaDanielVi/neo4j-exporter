@@ -1,0 +1,10 @@
+---
+# Example Ansible Vault file for neo4j-exporter secrets
+# Copy this file to vault.yml and encrypt it with: ansible-vault encrypt vault.yml
+# Then remove this example file for security.
+
+# Required: Neo4j password for the exporter to connect
+neo4j_exporter_neo4j_password: "your-secure-neo4j-password-here"
+
+# Optional: Password for service discovery (if different from above)
+# neo4j_exporter_sd_password: "sd-password-if-different"

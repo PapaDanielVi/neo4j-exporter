@@ -1,0 +1,6 @@
+---
+# Main tasks for neo4j_exporter role
+
+- name: Include deployment-specific tasks
+  ansible.builtin.import_tasks: "deploy-{{ neo4j_exporter_deployment_method }}.yml"
+  when: neo4j_exporter_deployment_method in ['binary', 'docker']
