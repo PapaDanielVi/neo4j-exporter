@@ -24,5 +24,4 @@ jobs:
 
           TARBALL=$(ls -1 ./*.tar.gz)
 
-          ansible-galaxy collection publish "${TARBALL}" --api-key "${{
-          secrets.ansible_galaxy_api_key }}"
+          ansible-galaxy collection publish "${TARBALL}" --api-key "${{ secrets.ansible_galaxy_api_key }}" -v
