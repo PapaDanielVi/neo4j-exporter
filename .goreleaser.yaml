@@ -49,8 +49,8 @@ changelog:
 
 dockers:
   - image_templates:
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:{{ .Tag }}-amd64"
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:latest-amd64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-amd64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:latest-amd64"
     dockerfile: Dockerfile
     use: buildx
     goos: linux
@@ -58,8 +58,8 @@ dockers:
     build_flag_templates:
       - "--platform=linux/amd64"
   - image_templates:
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:{{ .Tag }}-arm64"
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:latest-arm64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-arm64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:latest-arm64"
     dockerfile: Dockerfile
     use: buildx
     goos: linux
@@ -68,11 +68,11 @@ dockers:
       - "--platform=linux/arm64"
 
 docker_manifests:
-  - name_template: "ghcr.com/PapaDanielVi/neo4j-exporter:{{ .Tag }}"
+  - name_template: "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}"
     image_templates:
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:{{ .Tag }}-amd64"
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:{{ .Tag }}-arm64"
-  - name_template: "ghcr.com/PapaDanielVi/neo4j-exporter:latest"
+      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-amd64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:{{ .Tag }}-arm64"
+  - name_template: "ghcr.com/papadanielvi/neo4j-exporter:latest"
     image_templates:
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:latest-amd64"
-      - "ghcr.com/PapaDanielVi/neo4j-exporter:latest-arm64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:latest-amd64"
+      - "ghcr.com/papadanielvi/neo4j-exporter:latest-arm64"
