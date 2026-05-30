@@ -1,6 +1,4 @@
-# See https://docs.ansible.com/ansible/latest/dev_guide/collections_galaxy_meta.html
-
-namespace: PapaDanielVi
+namespace: papadanielvi
 name: neo4j_exporter
 version: 1.0.0
 readme: README.md
