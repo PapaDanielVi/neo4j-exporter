@@ -1,0 +1,4 @@
+---
+# Role metadata for neo4j_exporter
+
+requires_ansible: ">=2.15.0"
