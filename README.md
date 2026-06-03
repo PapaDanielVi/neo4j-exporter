@@ -41,6 +41,42 @@ go build -o neo4j-exporter ./cmd/neo4j-exporter
 ./neo4j-exporter --neo4j.uri=bolt://localhost:7687 --neo4j.password-file=/run/secrets/neo4j-password
 ```
 
+### Automated Installation Scripts
+
+Pre-built installation scripts are available for Linux and Windows that automatically detect your system architecture and install the latest release.
+
+#### Linux (Alpine, Debian/Ubuntu, RHEL/CentOS/Fedora)
+
+```bash
+# Download and run the installation script
+curl -sL https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-linux.sh | sudo bash
+
+# Or with custom install directory
+curl -sL https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-linux.sh | sudo INSTALL_DIR=/opt/neo4j-exporter bash
+```
+
+The script automatically:
+- Detects your architecture (x86_64 or arm64)
+- Detects your package manager (apk, apt, dnf/yum)
+- Downloads the appropriate package format
+- Installs or upgrades the binary
+
+#### Windows
+
+```powershell
+# Download and run the installation script
+iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-windows.ps1')
+
+# Or with custom install directory
+$env:INSTALL_DIR = "C:\tools\neo4j-exporter"
+iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-windows.ps1')
+```
+
+The script automatically:
+- Detects your architecture (x86_64 or arm64)
+- Downloads the tar.gz archive
+- Extracts and installs the binary
+
 ### Docker Compose
 
 ```yaml
