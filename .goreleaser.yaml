@@ -24,31 +24,52 @@ builds:
       - -X github.com/PapaDanielVi/neo4j-exporter/cmd/neo4j-exporter.Version={{ .Tag }}.buildDate={{.Date}}
 
 archives:
-  - format: tar.gz
+  - formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-    format_overrides:
-      - goos: windows
-        format: zip
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
 
-brews:
-  - repository:
+nfpms:
+  - id: neo4j-exporter
+    package_name: neo4j-exporter
+    maintainer: "PapaDanielVi <k2527806@gmail.com>"
+    description: "Prometheus exporter for Neo4j graph databases."
+    license: "MIT"
+    formats:
+      - apk
+      - deb
+      - rpm
+      - termux.deb
+      - archlinux
+
+homebrew_casks:
+  - name: neo4j-exporter
+
+    repository:
       owner: PapaDanielVi
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
-
-    directory: Formula
 
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
 
+    url:
+      verified: https://github.com/PapaDanielVi/neo4j-exporter
+
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/neo4j-exporter"]
+          end
+
+
     homepage: "https://github.com/PapaDanielVi/neo4j-exporter"
     description: "Prometheus exporter for Neo4j graph databases."
     license: "MIT"
-
-    test: |
-      system "#{bin}/neo4j-exporter --version"
