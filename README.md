@@ -49,10 +49,10 @@ Pre-built installation scripts are available for Linux and Windows that automati
 
 ```bash
 # Download and run the installation script
-curl -sL https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-linux.sh | sudo bash
+curl -sL https://gist.githubusercontent.com/PapaDanielVi/neo4j-exporter/raw/main/install-linux.sh | sudo bash
 
 # Or with custom install directory
-curl -sL https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-linux.sh | sudo INSTALL_DIR=/opt/neo4j-exporter bash
+curl -sL https://gist.githubusercontent.com/PapaDanielVi/neo4j-exporter/raw/main/install-linux.sh | sudo INSTALL_DIR=/opt/neo4j-exporter bash
 ```
 
 The script automatically:
@@ -65,11 +65,11 @@ The script automatically:
 
 ```powershell
 # Download and run the installation script
-iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-windows.ps1')
+iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/neo4j-exporter/raw/main/install-windows.ps1')
 
 # Or with custom install directory
 $env:INSTALL_DIR = "C:\tools\neo4j-exporter"
-iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/PapaDanielVi/raw/main/install-windows.ps1')
+iex (new-object net.webclient).DownloadString('https://gist.githubusercontent.com/PapaDanielVi/neo4j-exporter/raw/main/install-windows.ps1')
 ```
 
 The script automatically:
