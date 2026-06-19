@@ -17,9 +17,6 @@ services:
 {% if neo4j_exporter_custom_queries_file is defined %}
       - ./custom_queries.yaml:/config/custom_queries.yaml:ro
 {% endif %}
-{% if neo4j_exporter_lua_scripts_dir is defined %}
-      - ./lua:/lua:ro
-{% endif %}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--timeout=2", "-O-", "http://localhost:9121/healthz"]
       interval: 30s

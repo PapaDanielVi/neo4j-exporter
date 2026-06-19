@@ -20,7 +20,7 @@ against Community Edition.
 - **Service discovery** — `/sd` returns Prometheus HTTP_SD JSON for all databases on a cluster
 - **Concurrent collection** — all metric groups run in parallel goroutines per scrape
 - **Cached driver pool** — Bolt connections are reused and idle drivers reaped after 5 minutes
-- **Custom metrics** — define metrics via YAML or Lua scripts
+- **Custom metrics** — define metrics via YAML
 - **GDS monitoring** — Graph Data Science JVM heap, CPU, memory, and ongoing procedures
 - **Zero-secret flags** — passwords read from files, never from process lists
 - **Multi-platform** — Linux, macOS, Windows on amd64 and arm64; distroless Docker images
@@ -111,7 +111,6 @@ services:
 | `--neo4j.password-file` | `NEO4J_PASSWORD_FILE`           |                         | Path to password file       |
 | `--sd.primary-uri`      | `NEO4J_SD_PRIMARY_URI`          |                         | Primary URI for `/sd`       |
 | `--custom-queries-file` | `NEO4J_EXPORTER_CUSTOM_QUERIES` | `custom_queries.yaml`   | YAML custom metrics         |
-| `--lua-scripts-dir`     | `NEO4J_EXPORTER_LUA_DIR`        |                         | Directory of `.lua` scripts |
 | `--log.json`            |                                 | `false`                 | JSON log output             |
 
 ## Endpoints
@@ -283,28 +282,6 @@ custom_queries:
     type: "gauge"
     help: "Total suspended user profiles"
 ```
-
-## Custom Metrics (Lua)
-
-Place `.lua` files in the directory specified by `--lua-scripts-dir`:
-
-```lua
-local records = neo4j.query([[
-  MATCH (o:Order)
-  WHERE o.created_at > timestamp() - 60000
-  RETURN o.payment_method, sum(o.amount) as total
-]])
-
-for _, row in ipairs(records) do
-    prometheus_record_gauge("neo4j_sales_volume_bytes", row["total"], {
-        method = row["payment_method"]
-    })
-end
-```
-
-Two functions are available in Lua:
-- `neo4j.query(cypher)` — executes a read-only query, returns a table of rows
-- `prometheus_record_gauge(name, value, labels)` — records a gauge metric
 
 ## Prometheus Configuration
 

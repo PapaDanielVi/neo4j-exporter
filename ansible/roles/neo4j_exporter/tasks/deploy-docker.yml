@@ -20,7 +20,7 @@
     path: "{{ neo4j_exporter_install_dir }}"
     state: directory
     mode: '0755'
-  when: neo4j_exporter_custom_queries_file is defined or neo4j_exporter_lua_scripts_dir is defined
+  when: neo4j_exporter_custom_queries_file is defined
 
 - name: Copy custom queries to installation directory
   ansible.builtin.copy:
@@ -28,14 +28,6 @@
     dest: "{{ neo4j_exporter_install_dir }}/custom_queries.yaml"
     mode: '0644'
   when: neo4j_exporter_custom_queries_file is defined
-
-- name: Copy Lua scripts to installation directory
-  ansible.builtin.copy:
-    src: "{{ neo4j_exporter_lua_scripts_dir }}/"
-    dest: "{{ neo4j_exporter_install_dir }}/lua/"
-    mode: '0644'
-    directory_mode: '0755'
-  when: neo4j_exporter_lua_scripts_dir is defined
 
 - name: Pull neo4j-exporter Docker image
   ansible.builtin.command:
@@ -67,10 +59,6 @@
       {% if neo4j_exporter_custom_queries_file is defined %}
       -v={{ neo4j_exporter_install_dir }}/custom_queries.yaml:/etc/neo4j-exporter/custom_queries.yaml
       -e=NEO4J_EXPORTER_CUSTOM_QUERIES=/etc/neo4j-exporter/custom_queries.yaml
-      {% endif %}
-      {% if neo4j_exporter_lua_scripts_dir is defined %}
-      -v={{ neo4j_exporter_install_dir }}/lua:/etc/neo4j-exporter/lua
-      -e=NEO4J_EXPORTER_LUA_DIR=/etc/neo4j-exporter/lua
       {% endif %}
       {{ neo4j_exporter_docker_image }}
   register: neo4j_exporter_deploy_result

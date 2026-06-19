@@ -15,7 +15,6 @@ import (
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/config"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/discovery"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/driverpool"
-	"github.com/PapaDanielVi/neo4j-exporter/pkg/luaengine"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -45,8 +44,6 @@ func main() {
 	pool := driverpool.New()
 	defer pool.Close()
 
-	loadLuaEngine(cfg.LuaScriptsDir)
-
 	reg := prometheus.NewRegistry()
 	standaloneDriver := setupStandaloneCollector(reg, pool, cfg)
 	reg.MustRegister(newDriverPoolGauge(pool))
@@ -64,14 +61,6 @@ func setupLogger(json bool) {
 		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
 	}
 	slog.SetDefault(slog.New(handler))
-}
-
-func loadLuaEngine(dir string) {
-	luaEng, err := luaengine.New(dir)
-	if err != nil {
-		slog.Warn("lua engine init failed", "err", err)
-	}
-	_ = luaEng
 }
 
 // registerCustomQueries loads the YAML custom queries and, if any are defined,

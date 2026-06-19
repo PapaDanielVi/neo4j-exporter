@@ -21,7 +21,6 @@ neo4j_exporter_neo4j_password: null  # Required - prefer using password_file
 neo4j_exporter_neo4j_password_file: /etc/neo4j-exporter/password
 neo4j_exporter_sd_primary_uri: null  # Optional - for service discovery
 neo4j_exporter_custom_queries_file: null  # Optional - path to custom queries YAML
-neo4j_exporter_lua_scripts_dir: null  # Optional - path to Lua scripts directory
 neo4j_exporter_log_json: false
 
 # Docker deployment settings

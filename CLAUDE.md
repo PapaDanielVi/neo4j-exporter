@@ -83,7 +83,7 @@ golangci-lint run
 
 ### Entry Point
 
-`cmd/neo4j-exporter/main.go` — parses CLI flags, creates driver pool, optionally loads Lua engine and custom YAML queries, registers HTTP handlers, starts server (default `:9121`). Setup logic is extracted into helper functions (`setupLogger`, `setupHandlers`, `setupStandaloneCollector`, `serve`) to keep `main()` readable.
+`cmd/neo4j-exporter/main.go` — parses CLI flags, creates driver pool, optionally loads custom YAML queries, registers HTTP handlers, starts server (default `:9121`). Setup logic is extracted into helper functions (`setupLogger`, `setupHandlers`, `setupStandaloneCollector`, `serve`) to keep `main()` readable.
 
 ### Package Layout
 
@@ -93,7 +93,6 @@ golangci-lint run
 | `pkg/config/`     | CLI flag and env var parsing via kingpin                                                                                                                                                                              |
 | `pkg/driverpool/` | Thread-safe cached Neo4j driver pool with double-checked locking. Background reaper evicts idle drivers after 5 min. Max 5 connections per driver.                                                                    |
 | `pkg/discovery/`  | Runs `SHOW DATABASES` on system DB, returns HTTP_SD targets                                                                                                                                                           |
-| `pkg/luaengine/`  | Loads `.lua` scripts, exposes `neo4j.query()` and `prometheus_record_gauge()` to Lua state                                                                                                                            |
 
 ### Key Patterns
 
@@ -112,7 +111,6 @@ golangci-lint run
 ### Examples
 
 - `examples/custom_queries.yaml` — example YAML custom queries
-- `examples/custom_logic.lua` — example Lua custom metric script
 - `examples/grafana-dashboard.json` — pre-built Grafana dashboard for Neo4j metrics
 - `examples/docker-compose.neo4j.yml` — Docker Compose with Neo4j 5.x
 - `examples/docker-compose.neo4j4.yml` — Docker Compose with Neo4j 4.x

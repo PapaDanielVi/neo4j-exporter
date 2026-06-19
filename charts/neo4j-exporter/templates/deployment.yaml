@@ -40,9 +40,6 @@ spec:
             {{- if .Values.custom.queries }}
             - "--custom-queries-file=/config/custom_queries.yaml"
             {{- end }}
-            {{- if .Values.custom.luaScripts }}
-            - "--lua-scripts-dir=/lua"
-            {{- end }}
           ports:
             - name: http
               containerPort: 9121
@@ -67,21 +64,12 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /config
-            {{- if .Values.custom.luaScripts }}
-            - name: lua
-              mountPath: /lua
-            {{- end }}
           {{- end }}
       {{- if .Values.custom.queries }}
       volumes:
         - name: config
           configMap:
             name: {{ include "neo4j-exporter.fullname" . }}-config
-        {{- if .Values.custom.luaScripts }}
-        - name: lua
-          configMap:
-            name: {{ include "neo4j-exporter.fullname" . }}-lua
-        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

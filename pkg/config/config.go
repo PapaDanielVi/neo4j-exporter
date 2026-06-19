@@ -21,7 +21,6 @@ type Config struct {
 	SDPrimaryURI string
 	// Custom metrics
 	CustomQueriesFile string
-	LuaScriptsDir     string
 	// Logging
 	LogJSON bool
 }
@@ -52,9 +51,6 @@ func Parse(args []string) (*Config, error) {
 
 	app.Flag("custom-queries-file", "Path to YAML custom queries configuration.").
 		Default("custom_queries.yaml").Envar("NEO4J_EXPORTER_CUSTOM_QUERIES").StringVar(&cfg.CustomQueriesFile)
-
-	app.Flag("lua-scripts-dir", "Directory containing .lua scripts for custom metrics.").
-		Default("").Envar("NEO4J_EXPORTER_LUA_DIR").StringVar(&cfg.LuaScriptsDir)
 
 	app.Flag("log.json", "Output JSON logs instead of text.").
 		Default("false").BoolVar(&cfg.LogJSON)

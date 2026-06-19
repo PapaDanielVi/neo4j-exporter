@@ -56,7 +56,6 @@ serviceDiscovery:
 # Custom metrics
 custom:
   queries: {}
-  luaScripts: {}
 
 # Prometheus Operator ServiceMonitor
 serviceMonitor:

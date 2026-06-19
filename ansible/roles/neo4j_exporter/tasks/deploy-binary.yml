@@ -79,17 +79,6 @@
   when: neo4j_exporter_custom_queries is defined
   notify: Restart neo4j-exporter service
 
-- name: Deploy Lua scripts directory
-  ansible.builtin.copy:
-    src: "{{ neo4j_exporter_lua_scripts_dir }}/"
-    dest: "{{ neo4j_exporter_install_dir }}/lua/"
-    owner: "{{ neo4j_exporter_user }}"
-    group: "{{ neo4j_exporter_group }}"
-    mode: '0644'
-    directory_mode: '0755'
-  when: neo4j_exporter_lua_scripts_dir is defined
-  notify: Restart neo4j-exporter service
-
 - name: Deploy systemd service unit
   ansible.builtin.template:
     src: neo4j-exporter.service.j2
