@@ -286,6 +286,33 @@ func TestCollectMemory(t *testing.T) {
 	}
 }
 
+func TestCollectMemoryWrappedComposite(t *testing.T) {
+	t.Parallel()
+	// dbms.queryJmx wraps composite attributes as {"value": {...}}, which is how
+	// a real Neo4j instance reports HeapMemoryUsage.
+	r := &fakeRunner{
+		stubs: []stub{
+			{
+				match: "java.lang:type=Memory",
+				records: []*neo4j.Record{rec([]string{"attributes"}, map[string]any{
+					"HeapMemoryUsage": map[string]any{
+						"value": map[string]any{"used": int64(600), "committed": int64(900), "max": int64(1200), "init": int64(300)},
+					},
+				})},
+			},
+		},
+	}
+	c := collector.NewWithRunner(testTarget, r)
+	mfs := gather(t, c)
+
+	if v, ok := metricValue(mfs, "neo4j_jvm_heap_used_bytes", targetLabels(nil)); !ok || v != 600 {
+		t.Errorf("heap_used_bytes = %v ok=%v, want 600", v, ok)
+	}
+	if v, ok := metricValue(mfs, "neo4j_jvm_heap_max_bytes", targetLabels(nil)); !ok || v != 1200 {
+		t.Errorf("heap_max_bytes = %v ok=%v, want 1200", v, ok)
+	}
+}
+
 func TestCollectMemoryPools(t *testing.T) {
 	t.Parallel()
 	r := &fakeRunner{
