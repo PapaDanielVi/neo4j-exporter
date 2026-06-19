@@ -20,34 +20,6 @@ const (
 	integrationPassword = "testpassword123"
 )
 
-func dumpMemoryAttributes(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext) {
-	t.Helper()
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, DatabaseName: "system"})
-	defer session.Close(ctx)
-	res, err := session.Run(ctx,
-		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes",
-		map[string]any{"mbean": "java.lang:type=Memory"})
-	if err != nil {
-		t.Logf("DIAG memory query error: %v", err)
-		return
-	}
-	recs, err := res.Collect(ctx)
-	if err != nil {
-		t.Logf("DIAG memory collect error: %v", err)
-		return
-	}
-	for _, rec := range recs {
-		attrs, _ := rec.Get("attributes")
-		m, ok := attrs.(map[string]any)
-		if !ok {
-			t.Logf("DIAG attributes type=%T value=%#v", attrs, attrs)
-			continue
-		}
-		hmu := m["HeapMemoryUsage"]
-		t.Logf("DIAG HeapMemoryUsage type=%T value=%#v", hmu, hmu)
-	}
-}
-
 func TestIntegrationCommunityMetrics(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -80,10 +52,6 @@ func TestIntegrationCommunityMetrics(t *testing.T) {
 	if err := driver.VerifyConnectivity(connCtx); err != nil {
 		t.Fatalf("verifying connectivity: %v", err)
 	}
-
-	// Diagnostic: dump the raw shape of the Memory bean attributes so we can see
-	// exactly how dbms.queryJmx represents composite attributes.
-	dumpMemoryAttributes(ctx, t, driver)
 
 	c := collector.New(boltURL, driver)
 	mfs := gather(t, c)

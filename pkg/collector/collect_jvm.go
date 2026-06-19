@@ -20,9 +20,9 @@ const (
 )
 
 // jmxComposite extracts a numeric sub-field from a composite JMX attribute such
-// as HeapMemoryUsage, which is reported as a nested map of used/committed/max.
-// dbms.queryJmx wraps composite attributes as {"value": {...}}, so the inner
-// map is unwrapped when present.
+// as HeapMemoryUsage. dbms.queryJmx reports composites as
+// {"value": {"properties": {"used": ..., "committed": ..., ...}}}, so both the
+// "value" and "properties" layers are unwrapped when present.
 func jmxComposite(attrs map[string]any, attr, field string) (float64, bool) {
 	raw, ok := attrs[attr]
 	if !ok || raw == nil {
@@ -34,6 +34,9 @@ func jmxComposite(attrs map[string]any, attr, field string) (float64, bool) {
 	}
 	if inner, ok := m["value"].(map[string]any); ok {
 		m = inner
+	}
+	if props, ok := m["properties"].(map[string]any); ok {
+		m = props
 	}
 	return jmxValue(m[field])
 }
