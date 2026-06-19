@@ -1,12 +1,25 @@
+# Custom queries are executed in standalone mode against the configured database.
+#
+# Contract:
+#   - Each query must return exactly one row (a scalar metric).
+#   - The metric value comes from the column named by `value`. If `value` is
+#     omitted, the exporter uses a column named "value", then "count", then the
+#     first numeric column it finds.
+#   - `labels` are emitted as constant labels on the metric.
+#   - `type` is "gauge" (default) or "counter".
+#
+# Grouped queries that return one row per label value are not supported; run a
+# separate query per series instead.
+
 custom_queries:
-  - query: "MATCH (u:User {status: 'suspended'}) RETURN count(u) as count"
+  - query: "MATCH (u:User {status: 'suspended'}) RETURN count(u) AS count"
     metric_name: "neo4j_custom_suspended_users_total"
     type: "gauge"
     help: "Total number of currently suspended user profiles"
 
-  - query: "MATCH (n) RETURN labels(n) as label, count(n) as count"
-    metric_name: "neo4j_custom_nodes_by_label"
+  - query: "MATCH (n:Order) RETURN count(n) AS value"
+    metric_name: "neo4j_custom_orders_total"
     type: "gauge"
-    help: "Number of nodes grouped by label"
+    help: "Total number of Order nodes"
     labels:
       group: "topology"

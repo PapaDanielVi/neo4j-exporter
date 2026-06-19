@@ -16,6 +16,7 @@ import (
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/discovery"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/driverpool"
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/luaengine"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -45,7 +46,6 @@ func main() {
 	defer pool.Close()
 
 	loadLuaEngine(cfg.LuaScriptsDir)
-	loadCustomQueries(cfg.CustomQueriesFile)
 
 	reg := prometheus.NewRegistry()
 	standaloneDriver := setupStandaloneCollector(reg, pool, cfg)
@@ -74,12 +74,19 @@ func loadLuaEngine(dir string) {
 	_ = luaEng
 }
 
-func loadCustomQueries(file string) {
+// registerCustomQueries loads the YAML custom queries and, if any are defined,
+// registers a collector that executes them against the standalone driver.
+func registerCustomQueries(reg *prometheus.Registry, driver neo4j.DriverWithContext, file string) {
 	customQueries, err := collector.LoadCustomQueries(file)
 	if err != nil {
 		slog.Warn("custom queries load failed", "err", err)
+		return
 	}
-	_ = customQueries
+	if len(customQueries.Queries) == 0 {
+		return
+	}
+	reg.MustRegister(collector.NewCustomCollector(customQueries, driver))
+	slog.Info("registered custom queries", "count", len(customQueries.Queries))
 }
 
 // neo4jDriver is the subset of neo4j.DriverWithContext we need for readiness checks.
@@ -95,6 +102,7 @@ func setupStandaloneCollector(reg *prometheus.Registry, pool *driverpool.Pool, c
 	}
 	coll := collector.New(cfg.Neo4jURI, standaloneDriver)
 	reg.MustRegister(coll)
+	registerCustomQueries(reg, standaloneDriver, cfg.CustomQueriesFile)
 	return standaloneDriver
 }
 

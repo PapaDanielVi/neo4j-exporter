@@ -7,6 +7,31 @@
 
 ---
 
+## Update (2026-06-19): metric set reworked
+
+The analysis below documents the original state, where most metrics relied on
+`org.neo4j:instance=0,name=*` JMX beans that no longer exist in Neo4j 4.0+. Those
+beans were replaced by `neo4j.metrics:*`, which are an Enterprise-only feature, so
+they return nothing on Community.
+
+The exporter was reworked to target Community Edition using only data reachable
+over Bolt:
+
+- Expanded `java.lang:*` JMX coverage: heap/non-heap memory, memory pools, GC
+  count and time, and OperatingSystem (CPU load, file descriptors, host memory).
+- Cypher-derived metrics: `SHOW DATABASES` (topology/health), `SHOW TRANSACTIONS`
+  (active per database), `dbms.listPools()` (pool memory), `SHOW INDEXES` and
+  `SHOW CONSTRAINTS` (health counts).
+- Optional APOC metrics (auto-detected): `apoc.monitor.store/ids/tx` for store
+  size, entity counts, and cumulative transaction counters.
+- Edition and APOC detection via `dbms.components()` and `SHOW PROCEDURES`.
+
+Page cache, checkpoint, log rotation, Cypher replan, Bolt connection counters,
+query latency, and clustering metrics remain Enterprise-only and are not exposed.
+See the README metrics tables for the current set.
+
+---
+
 ## Summary
 
 | Metric Family | Type | Data Points | Status |

@@ -12,17 +12,14 @@ import (
 // ── GDS (Graph Data Science) ───────────────────────────────────────
 
 func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, readSessionCfg())
-	defer session.Close(ctx)
-
-	// gds.systemMonitor() — returns heap, CPU, and ongoing procedures
-	result, err := session.Run(ctx, "CALL gds.systemMonitor() YIELD freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, ongoingGdsProcedures RETURN freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, size(ongoingGdsProcedures) AS ongoingCount", nil)
+	// gds.systemMonitor() — returns heap, CPU, and ongoing procedures.
+	records, err := c.run.Query(ctx, readSessionCfg(), "CALL gds.systemMonitor() YIELD freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, ongoingGdsProcedures RETURN freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, size(ongoingGdsProcedures) AS ongoingCount", nil)
 	if err != nil {
 		slog.Debug("gds.systemMonitor() not available (GDS plugin may not be installed)", "err", err)
 		return
 	}
-	rec, err := result.Single(ctx)
-	if err != nil {
+	rec, ok := single(records)
+	if !ok {
 		return
 	}
 
@@ -46,39 +43,31 @@ func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric,
 		}
 	}
 
-	// gds.memory.summary() — graph and task memory
-	summaryResult, err := session.Run(ctx,
+	// gds.memory.summary() — graph and task memory. Summing per-user rows
+	// handles both single-user and multi-user instances uniformly.
+	summaryRecords, err := c.run.Query(ctx, readSessionCfg(),
 		"CALL gds.memory.summary() YIELD user, totalGraphsMemory, totalTasksMemory RETURN totalGraphsMemory, totalTasksMemory", nil)
 	if err != nil {
 		slog.Debug("gds.memory.summary() not available", "err", err)
 		return
 	}
-	summaryRec, err := summaryResult.Single(ctx)
-	if err != nil {
-		c.emitMemoryMetrics(ch, ctx, summaryResult, labels)
-		return
-	}
-	emitHeapMetric(ch, summaryRec, "totalGraphsMemory", c.gdsGraphMemoryBytes, labels)
-	emitHeapMetric(ch, summaryRec, "totalTasksMemory", c.gdsTaskMemoryBytes, labels)
+	c.emitMemoryMetrics(ch, summaryRecords, labels)
 }
 
 // ── Heavy transactions ─────────────────────────────────────────────
 
 func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, systemSessionCfg())
-	defer session.Close(ctx)
-
 	heavyTxQuery := "SHOW TRANSACTIONS " +
 		"YIELD transactionId, elapsedTime, pageFaults " +
 		"WHERE elapsedTime.milliseconds > 5000 " +
 		"RETURN count(*) AS heavy_count, sum(pageFaults) AS total_faults"
-	result, err := session.Run(ctx, heavyTxQuery, nil)
+	records, err := c.run.Query(ctx, systemSessionCfg(), heavyTxQuery, nil)
 	if err != nil {
 		slog.Warn("heavy transactions query failed", "err", err)
 		return
 	}
-	rec, err := result.Single(ctx)
-	if err != nil {
+	rec, ok := single(records)
+	if !ok {
 		return
 	}
 	countVal, _ := rec.Get("heavy_count")
@@ -98,9 +87,7 @@ func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prom
 
 func (c *Collector) collectSynthetic(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
 	start := time.Now()
-	session := c.driver.NewSession(ctx, systemSessionCfg())
-	defer session.Close(ctx)
-	_, err := session.Run(ctx, "CALL dbms.components() YIELD name RETURN name LIMIT 1", nil)
+	_, err := c.run.Query(ctx, systemSessionCfg(), "CALL dbms.components() YIELD name RETURN name LIMIT 1", nil)
 	if err != nil {
 		slog.Warn("synthetic query failed", "err", err)
 		return
@@ -108,11 +95,7 @@ func (c *Collector) collectSynthetic(ctx context.Context, ch chan<- prometheus.M
 	ch <- prometheus.MustNewConstMetric(c.syntheticQueryDur, prometheus.GaugeValue, time.Since(start).Seconds(), labels...)
 }
 
-func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, ctx context.Context, result neo4j.ResultWithContext, labels []string) { //nolint:revive
-	records, err := result.Collect(ctx)
-	if err != nil {
-		return
-	}
+func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, records []*neo4j.Record, labels []string) {
 	var totalGraphMem, totalTaskMem float64
 	for _, sr := range records {
 		if v, ok := sr.Get("totalGraphsMemory"); ok && v != nil {
@@ -128,11 +111,4 @@ func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, ctx context.C
 	}
 	ch <- prometheus.MustNewConstMetric(c.gdsGraphMemoryBytes, prometheus.GaugeValue, totalGraphMem, labels...)
 	ch <- prometheus.MustNewConstMetric(c.gdsTaskMemoryBytes, prometheus.GaugeValue, totalTaskMem, labels...)
-}
-
-func emitHeapMetric(ch chan<- prometheus.Metric, rec *neo4j.Record, key string, desc *prometheus.Desc, labels []string) {
-	val, _ := rec.Get(key)
-	if fval, ok := jmxValue(val); ok {
-		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, fval, labels...)
-	}
 }
