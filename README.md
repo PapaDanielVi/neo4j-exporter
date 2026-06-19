@@ -7,9 +7,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Reference](https://pkg.go.dev/badge/github.com/PapaDanielVi/neo4j-exporter.svg)](https://pkg.go.dev/github.com/PapaDanielVi/neo4j-exporter)
 
-Prometheus exporter for Neo4j graph databases. Exposes metrics from Neo4j via the
-Bolt protocol — including JVM, NIO buffer pools, Bolt connections, page cache,
-transactions, Graph Data Science (GDS), and custom Cypher queries.
+Prometheus exporter for Neo4j graph databases. Exposes metrics from Neo4j over the
+Bolt protocol: JVM (memory, GC, threads, buffer pools), operating system, database
+topology and health, memory pools, index and constraint state, Graph Data Science
+(GDS), optional APOC store/id/transaction metrics, and custom Cypher queries. Works
+against Community Edition.
 
 ## Features
 
@@ -124,6 +126,18 @@ services:
 
 ## Metrics
 
+All metrics are collected over Bolt, so the exporter works against Community
+Edition. It pulls from the standard `java.lang:*` JMX beans, Cypher `SHOW`
+commands, `dbms.listPools()`, GDS procedures, and (when installed) APOC monitor
+procedures.
+
+Some Neo4j telemetry is produced only by the Enterprise metrics subsystem and
+has no Community equivalent over Bolt: page cache hit/fault/eviction counters,
+checkpoint and log-rotation timings, Cypher replan stats, Bolt connection
+counters, query latency histograms, and clustering/raft metrics. Those are not
+exposed here. Store size, entity counts, and cumulative transaction counters are
+available on Community only when APOC is installed.
+
 ### Exporter Self-Metrics
 
 | Metric                                   | Type  | Description              |
@@ -161,6 +175,69 @@ services:
 | -------------------------- | ----- | ------------------ |
 | `neo4j_jvm_uptime_seconds` | Gauge | JVM uptime seconds |
 
+### JVM Memory
+
+| Metric                              | Type  | Labels | Description                  |
+| ----------------------------------- | ----- | ------ | ---------------------------- |
+| `neo4j_jvm_heap_used_bytes`         | Gauge |        | Used heap memory             |
+| `neo4j_jvm_heap_committed_bytes`    | Gauge |        | Committed heap memory        |
+| `neo4j_jvm_heap_max_bytes`          | Gauge |        | Maximum heap memory          |
+| `neo4j_jvm_heap_init_bytes`         | Gauge |        | Initial heap memory          |
+| `neo4j_jvm_nonheap_used_bytes`      | Gauge |        | Used non-heap memory         |
+| `neo4j_jvm_nonheap_committed_bytes` | Gauge |        | Committed non-heap memory    |
+| `neo4j_jvm_nonheap_max_bytes`       | Gauge |        | Maximum non-heap memory      |
+| `neo4j_jvm_memory_pool_used_bytes`  | Gauge | pool   | Used memory per memory pool  |
+| `neo4j_jvm_memory_pool_committed_bytes` | Gauge | pool | Committed memory per pool   |
+| `neo4j_jvm_memory_pool_max_bytes`   | Gauge | pool   | Max memory per memory pool   |
+
+### JVM Garbage Collection
+
+| Metric                                  | Type    | Labels | Description                 |
+| --------------------------------------- | ------- | ------ | --------------------------- |
+| `neo4j_jvm_gc_collection_count_total`   | Counter | gc     | Total GC collections        |
+| `neo4j_jvm_gc_collection_seconds_total` | Counter | gc     | Total time spent in GC      |
+
+### Operating System
+
+| Metric                                   | Type  | Description                          |
+| ---------------------------------------- | ----- | ------------------------------------ |
+| `neo4j_jvm_process_cpu_load`             | Gauge | Process CPU load (0..1)              |
+| `neo4j_jvm_system_cpu_load`              | Gauge | Host CPU load (0..1)                 |
+| `neo4j_jvm_open_file_descriptors`        | Gauge | Open file descriptors                |
+| `neo4j_jvm_max_file_descriptors`         | Gauge | Maximum allowed file descriptors     |
+| `neo4j_jvm_free_physical_memory_bytes`   | Gauge | Free physical memory on the host     |
+| `neo4j_jvm_committed_virtual_memory_bytes` | Gauge | Committed virtual memory           |
+| `neo4j_jvm_system_load_average`          | Gauge | System load average (1 min)          |
+| `neo4j_jvm_available_processors`         | Gauge | Processors available to the JVM      |
+
+### Database Topology & Health
+
+| Metric                               | Type  | Labels           | Source             |
+| ------------------------------------ | ----- | ---------------- | ------------------ |
+| `neo4j_database_online`              | Gauge | database, role   | `SHOW DATABASES`   |
+| `neo4j_database_transactions_active` | Gauge | database         | `SHOW TRANSACTIONS`|
+| `neo4j_dbms_pool_used_heap_bytes`    | Gauge | pool, database   | `dbms.listPools()` |
+| `neo4j_dbms_pool_used_native_bytes`  | Gauge | pool, database   | `dbms.listPools()` |
+| `neo4j_indexes_total`                | Gauge |                  | `SHOW INDEXES`     |
+| `neo4j_indexes_online`               | Gauge |                  | `SHOW INDEXES`     |
+| `neo4j_indexes_failed`               | Gauge |                  | `SHOW INDEXES`     |
+| `neo4j_constraints_total`            | Gauge |                  | `SHOW CONSTRAINTS` |
+
+### APOC-Derived (optional)
+
+These are emitted only when APOC is installed on the target. Detection is automatic.
+
+| Metric                                  | Type    | Labels | Source                |
+| --------------------------------------- | ------- | ------ | --------------------- |
+| `neo4j_store_size_bytes`                | Gauge   | type   | `apoc.monitor.store()`|
+| `neo4j_ids_in_use`                      | Gauge   | kind   | `apoc.monitor.ids()`  |
+| `neo4j_transactions_committed_total`    | Counter |        | `apoc.monitor.tx()`   |
+| `neo4j_transactions_opened_total`       | Counter |        | `apoc.monitor.tx()`   |
+| `neo4j_transactions_rolled_back_total`  | Counter |        | `apoc.monitor.tx()`   |
+| `neo4j_transactions_open`               | Gauge   |        | `apoc.monitor.tx()`   |
+| `neo4j_transactions_peak_concurrent`    | Gauge   |        | `apoc.monitor.tx()`   |
+| `neo4j_last_committed_tx_id`            | Gauge   |        | `apoc.monitor.tx()`   |
+
 ### GDS — Graph Data Science
 
 | Metric                                        | Type  | Labels | Description                            |
@@ -184,8 +261,10 @@ services:
 
 ### QPS (PromQL)
 
+Requires APOC (for the cumulative transaction counters):
+
 ```
-rate(neo4j_database_transaction_committed_total[1m]) + rate(neo4j_database_transaction_rollbacks_total[1m])
+rate(neo4j_transactions_committed_total[1m]) + rate(neo4j_transactions_rolled_back_total[1m])
 ```
 
 ## Grafana Dashboard

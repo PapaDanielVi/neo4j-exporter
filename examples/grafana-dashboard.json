@@ -437,6 +437,276 @@
           }
         }
       }
+    },
+    {
+      "title": "JVM Memory & GC",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
+      "panels": []
+    },
+    {
+      "title": "JVM Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_jvm_heap_used_bytes{target=~\"$target\"}", "legendFormat": "Used ({{target}})", "refId": "A" },
+        { "expr": "neo4j_jvm_heap_committed_bytes{target=~\"$target\"}", "legendFormat": "Committed ({{target}})", "refId": "B" },
+        { "expr": "neo4j_jvm_heap_max_bytes{target=~\"$target\"}", "legendFormat": "Max ({{target}})", "refId": "C" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "JVM Non-Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_jvm_nonheap_used_bytes{target=~\"$target\"}", "legendFormat": "Used ({{target}})", "refId": "A" },
+        { "expr": "neo4j_jvm_nonheap_committed_bytes{target=~\"$target\"}", "legendFormat": "Committed ({{target}})", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "JVM Memory Pools — Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 61 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_jvm_memory_pool_used_bytes{target=~\"$target\"}", "legendFormat": "{{pool}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "GC Time Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 61 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "rate(neo4j_jvm_gc_collection_seconds_total{target=~\"$target\"}[5m])", "legendFormat": "{{gc}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 15 }
+        }
+      },
+      "description": "Seconds spent in GC per second, by collector."
+    },
+    {
+      "title": "GC Collection Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 69 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "rate(neo4j_jvm_gc_collection_count_total{target=~\"$target\"}[5m])", "legendFormat": "{{gc}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 15 }
+        }
+      }
+    },
+    {
+      "title": "CPU Load",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 69 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_jvm_process_cpu_load{target=~\"$target\"}", "legendFormat": "Process ({{target}})", "refId": "A" },
+        { "expr": "neo4j_jvm_system_cpu_load{target=~\"$target\"}", "legendFormat": "System ({{target}})", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "File Descriptors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 77 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_jvm_open_file_descriptors{target=~\"$target\"}", "legendFormat": "Open ({{target}})", "refId": "A" },
+        { "expr": "neo4j_jvm_max_file_descriptors{target=~\"$target\"}", "legendFormat": "Max ({{target}})", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "Database Health & Topology",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 85 },
+      "panels": []
+    },
+    {
+      "title": "Databases Online",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 86 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_database_online{target=~\"$target\"}", "legendFormat": "{{database}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 15 }
+        }
+      },
+      "description": "1 when the database currentStatus is online."
+    },
+    {
+      "title": "Active Transactions per Database",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 86 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_database_transactions_active{target=~\"$target\"}", "legendFormat": "{{database}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "Memory Pools — Used",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 94 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_dbms_pool_used_heap_bytes{target=~\"$target\"}", "legendFormat": "Heap {{pool}}/{{database}}", "refId": "A" },
+        { "expr": "neo4j_dbms_pool_used_native_bytes{target=~\"$target\"}", "legendFormat": "Native {{pool}}/{{database}}", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      },
+      "description": "Memory pool usage from dbms.listPools()."
+    },
+    {
+      "title": "Index Health",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 94 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_indexes_total{target=~\"$target\"}", "legendFormat": "Total ({{target}})", "refId": "A" },
+        { "expr": "neo4j_indexes_online{target=~\"$target\"}", "legendFormat": "Online ({{target}})", "refId": "B" },
+        { "expr": "neo4j_indexes_failed{target=~\"$target\"}", "legendFormat": "Failed ({{target}})", "refId": "C" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "Constraints",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 102 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_constraints_total{target=~\"$target\"}", "legendFormat": "{{target}}", "refId": "A" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area", "textMode": "value_and_name" }
+    },
+    {
+      "title": "APOC-derived (optional, requires APOC)",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 110 },
+      "panels": []
+    },
+    {
+      "title": "Store Size by Type",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 111 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_store_size_bytes{target=~\"$target\"}", "legendFormat": "{{type}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      },
+      "description": "On-disk store size from apoc.monitor.store(). Requires APOC."
+    },
+    {
+      "title": "IDs in Use",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 111 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_ids_in_use{target=~\"$target\"}", "legendFormat": "{{kind}} ({{target}})", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      },
+      "description": "Entity IDs in use from apoc.monitor.ids(). Requires APOC."
+    },
+    {
+      "title": "Transaction Throughput",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 119 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "rate(neo4j_transactions_committed_total{target=~\"$target\"}[5m])", "legendFormat": "Committed/s ({{target}})", "refId": "A" },
+        { "expr": "rate(neo4j_transactions_rolled_back_total{target=~\"$target\"}[5m])", "legendFormat": "Rolled back/s ({{target}})", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      },
+      "description": "Transaction rates from apoc.monitor.tx(). Requires APOC."
+    },
+    {
+      "title": "Open vs Peak Transactions",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 119 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "expr": "neo4j_transactions_open{target=~\"$target\"}", "legendFormat": "Open ({{target}})", "refId": "A" },
+        { "expr": "neo4j_transactions_peak_concurrent{target=~\"$target\"}", "legendFormat": "Peak ({{target}})", "refId": "B" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "linear", "fillOpacity": 10 }
+        }
+      },
+      "description": "Open and peak concurrent transactions from apoc.monitor.tx(). Requires APOC."
     }
   ],
   "schemaVersion": 38,

@@ -64,6 +64,14 @@
       -e=NEO4J_PASSWORD={{ neo4j_exporter_neo4j_password }}
       -e=NEO4J_EXPORTER_LISTEN_ADDRESS={{ neo4j_exporter_listen_address | regex_replace('^:', '') }}
       -e=NEO4J_EXPORTER_LOG_JSON={{ 'true' if neo4j_exporter_log_json else 'false' }}
+      {% if neo4j_exporter_custom_queries_file is defined %}
+      -v={{ neo4j_exporter_install_dir }}/custom_queries.yaml:/etc/neo4j-exporter/custom_queries.yaml
+      -e=NEO4J_EXPORTER_CUSTOM_QUERIES=/etc/neo4j-exporter/custom_queries.yaml
+      {% endif %}
+      {% if neo4j_exporter_lua_scripts_dir is defined %}
+      -v={{ neo4j_exporter_install_dir }}/lua:/etc/neo4j-exporter/lua
+      -e=NEO4J_EXPORTER_LUA_DIR=/etc/neo4j-exporter/lua
+      {% endif %}
       {{ neo4j_exporter_docker_image }}
   register: neo4j_exporter_deploy_result
   changed_when: neo4j_exporter_deploy_result.rc == 0

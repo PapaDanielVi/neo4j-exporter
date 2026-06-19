@@ -10,18 +10,10 @@ import (
 // ── NIO Buffer Pools ───────────────────────────────────────────────
 
 func (c *Collector) collectNIOBufferPools(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, systemSessionCfg())
-	defer session.Close(ctx)
-
-	result, err := session.Run(ctx,
-		"CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes",
-		map[string]any{jmxMBeanParam: nioBufferPoolMBean})
+	records, err := c.run.Query(ctx, systemSessionCfg(),
+		jmxQueryNameAttrs, map[string]any{jmxMBeanParam: nioBufferPoolMBean})
 	if err != nil {
 		slog.Warn("NIO buffer pool query failed", "err", err)
-		return
-	}
-	records, err := result.Collect(ctx)
-	if err != nil {
 		return
 	}
 	for _, rec := range records {
@@ -80,16 +72,14 @@ func (c *Collector) collectClassLoading(ctx context.Context, ch chan<- prometheu
 // ── Runtime (uptime) ───────────────────────────────────────────────
 
 func (c *Collector) collectRuntime(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
-	session := c.driver.NewSession(ctx, systemSessionCfg())
-	defer session.Close(ctx)
-	result, err := session.Run(ctx,
+	records, err := c.run.Query(ctx, systemSessionCfg(),
 		"CALL dbms.queryJmx($mbean) YIELD attributes RETURN attributes['Uptime'] AS uptime",
-		map[string]any{"mbean": "java.lang:type=Runtime"})
+		map[string]any{jmxMBeanParam: "java.lang:type=Runtime"})
 	if err != nil {
 		return
 	}
-	rec, err := result.Single(ctx)
-	if err != nil {
+	rec, ok := single(records)
+	if !ok {
 		return
 	}
 	val, _ := rec.Get("uptime")
