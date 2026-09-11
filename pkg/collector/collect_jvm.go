@@ -9,14 +9,16 @@ import (
 )
 
 const (
-	memoryMBean       = "java.lang:type=Memory"
-	memoryPoolMBean   = "java.lang:type=MemoryPool,name=*"
-	gcMBean           = "java.lang:type=GarbageCollector,name=*"
-	osMBean           = "java.lang:type=OperatingSystem"
-	jmxAttrUsage      = "Usage"
-	jmxFieldUsed      = "used"
-	jmxFieldCommitted = "committed"
-	jmxFieldMax       = "max"
+	memoryMBean         = "java.lang:type=Memory"
+	memoryPoolMBean     = "java.lang:type=MemoryPool,name=*"
+	gcMBean             = "java.lang:type=GarbageCollector,name=*"
+	osMBean             = "java.lang:type=OperatingSystem"
+	jmxAttrUsage        = "Usage"
+	jmxAttrHeapUsage    = "HeapMemoryUsage"
+	jmxAttrNonHeapUsage = "NonHeapMemoryUsage"
+	jmxFieldUsed        = "used"
+	jmxFieldCommitted   = "committed"
+	jmxFieldMax         = "max"
 )
 
 // jmxComposite extracts a numeric sub-field from a composite JMX attribute such
@@ -66,7 +68,7 @@ func recordAttributes(rec *neo4j.Record) (string, map[string]any, bool) {
 
 // ── JVM memory (heap / non-heap) ────────────────────────────────────
 
-func (c *Collector) collectMemory(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectMemory(ctx context.Context, ch chan<- prometheus.Metric) {
 	rec, ok := single(c.jmxAttrs(ctx, memoryMBean))
 	if !ok {
 		return
@@ -77,52 +79,42 @@ func (c *Collector) collectMemory(ctx context.Context, ch chan<- prometheus.Metr
 		return
 	}
 
-	heap := []struct {
+	memoryMetrics := []struct {
+		attr  string
 		field string
 		desc  *prometheus.Desc
 	}{
-		{jmxFieldUsed, c.jvmHeapUsed},
-		{jmxFieldCommitted, c.jvmHeapCommitted},
-		{jmxFieldMax, c.jvmHeapMax},
-		{"init", c.jvmHeapInit},
+		{jmxAttrHeapUsage, jmxFieldUsed, c.jvmHeapUsed},
+		{jmxAttrHeapUsage, jmxFieldCommitted, c.jvmHeapCommitted},
+		{jmxAttrHeapUsage, jmxFieldMax, c.jvmHeapMax},
+		{jmxAttrHeapUsage, "init", c.jvmHeapInit},
+		{jmxAttrNonHeapUsage, jmxFieldUsed, c.jvmNonHeapUsed},
+		{jmxAttrNonHeapUsage, jmxFieldCommitted, c.jvmNonHeapCommitted},
+		{jmxAttrNonHeapUsage, jmxFieldMax, c.jvmNonHeapMax},
 	}
-	for _, h := range heap {
-		if v, ok := jmxComposite(attrs, "HeapMemoryUsage", h.field); ok {
-			ch <- prometheus.MustNewConstMetric(h.desc, prometheus.GaugeValue, v, labels...)
-		}
-	}
-
-	nonHeap := []struct {
-		field string
-		desc  *prometheus.Desc
-	}{
-		{jmxFieldUsed, c.jvmNonHeapUsed},
-		{jmxFieldCommitted, c.jvmNonHeapCommitted},
-		{jmxFieldMax, c.jvmNonHeapMax},
-	}
-	for _, h := range nonHeap {
-		if v, ok := jmxComposite(attrs, "NonHeapMemoryUsage", h.field); ok {
-			ch <- prometheus.MustNewConstMetric(h.desc, prometheus.GaugeValue, v, labels...)
+	for _, m := range memoryMetrics {
+		if v, ok := jmxComposite(attrs, m.attr, m.field); ok {
+			ch <- prometheus.MustNewConstMetric(m.desc, prometheus.GaugeValue, v)
 		}
 	}
 }
 
 // ── JVM memory pools ────────────────────────────────────────────────
 
-func (c *Collector) collectMemoryPools(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectMemoryPools(ctx context.Context, ch chan<- prometheus.Metric) {
 	for _, rec := range c.jmxNamed(ctx, memoryPoolMBean) {
 		name, attrs, ok := recordAttributes(rec)
 		if !ok || name == "" {
 			continue
 		}
-		poolLabels := append(append([]string{}, labels...), beanNameProperty(name))
+		poolName := beanNameProperty(name)
 		for field, desc := range map[string]*prometheus.Desc{
 			jmxFieldUsed:      c.jvmMemoryPoolUsed,
 			jmxFieldCommitted: c.jvmMemoryPoolCommit,
 			jmxFieldMax:       c.jvmMemoryPoolMax,
 		} {
 			if v, ok := jmxComposite(attrs, jmxAttrUsage, field); ok {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, poolLabels...)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, poolName)
 			}
 		}
 	}
@@ -130,26 +122,26 @@ func (c *Collector) collectMemoryPools(ctx context.Context, ch chan<- prometheus
 
 // ── JVM garbage collection ──────────────────────────────────────────
 
-func (c *Collector) collectGC(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectGC(ctx context.Context, ch chan<- prometheus.Metric) {
 	for _, rec := range c.jmxNamed(ctx, gcMBean) {
 		name, attrs, ok := recordAttributes(rec)
 		if !ok || name == "" {
 			continue
 		}
-		gcLabels := append(append([]string{}, labels...), beanNameProperty(name))
+		gcName := beanNameProperty(name)
 		if v, ok := jmxValue(attrs["CollectionCount"]); ok {
-			ch <- prometheus.MustNewConstMetric(c.jvmGCCount, prometheus.CounterValue, v, gcLabels...)
+			ch <- prometheus.MustNewConstMetric(c.jvmGCCount, prometheus.CounterValue, v, gcName)
 		}
 		if v, ok := jmxValue(attrs["CollectionTime"]); ok {
 			// CollectionTime is reported in milliseconds.
-			ch <- prometheus.MustNewConstMetric(c.jvmGCTime, prometheus.CounterValue, v/1000.0, gcLabels...)
+			ch <- prometheus.MustNewConstMetric(c.jvmGCTime, prometheus.CounterValue, v/1000.0, gcName)
 		}
 	}
 }
 
 // ── Operating system ────────────────────────────────────────────────
 
-func (c *Collector) collectOS(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectOS(ctx context.Context, ch chan<- prometheus.Metric) {
 	rec, ok := single(c.jmxAttrs(ctx, osMBean))
 	if !ok {
 		return
@@ -170,7 +162,7 @@ func (c *Collector) collectOS(ctx context.Context, ch chan<- prometheus.Metric, 
 		"AvailableProcessors":        c.osAvailableProcs,
 	} {
 		if v, ok := jmxValue(attrs[attr]); ok {
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v, labels...)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, v)
 		}
 	}
 }

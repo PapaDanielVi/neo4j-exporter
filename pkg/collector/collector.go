@@ -20,6 +20,8 @@ const (
 	jmxQueryNameAttrs  = "CALL dbms.queryJmx($mbean) YIELD name, attributes RETURN name, attributes"
 	nioBufferPoolMBean = "java.nio:type=BufferPool,name=*"
 	jmxMBeanParam      = "mbean"
+	labelPool          = "pool"
+	labelDatabase      = "database"
 )
 
 func readSessionCfg() neo4j.SessionConfig {
@@ -96,13 +98,10 @@ func recordString(rec *neo4j.Record, key string) string {
 
 // Collector implements prometheus.Collector for Neo4j metrics.
 type Collector struct {
-	run               Runner
-	target            string
-	neo4jMajorVersion int
-	neo4jMinorVersion int
-	edition           string
-	apocAvailable     bool
-	detected          bool
+	run           Runner
+	target        string
+	apocAvailable bool
+	detected      bool
 
 	// Exporter self-metrics
 	up             *prometheus.Desc
@@ -192,167 +191,119 @@ func New(target string, driver neo4j.DriverWithContext) *Collector {
 // the collector can be driven by fakes in tests or alternative data sources.
 func NewWithRunner(target string, r Runner) *Collector {
 	const ns = "neo4j"
-	labels := []string{"target"}
+	sanitizedTarget := sanitizeTarget(target)
+	constLabels := prometheus.Labels{"target": sanitizedTarget}
 
 	c := &Collector{
 		run:    r,
-		target: sanitizeTarget(target),
+		target: sanitizedTarget,
 
 		// ── Exporter self-metrics ─────────────────────────────────
 		up: prometheus.NewDesc(ns+"_exporter_up",
-			"1 if target Neo4j instance is reachable, else 0", labels, nil),
+			"1 if target Neo4j instance is reachable, else 0", nil, constLabels),
 		scrapeDuration: prometheus.NewDesc(ns+"_exporter_scrape_duration_seconds",
-			"Latency of scrape phases", append(labels, "phase"), nil),
+			"Latency of scrape phases", []string{"phase"}, constLabels),
 
 		// ── NIO Buffer Pools ──────────────────────────────────────
-		bufferPoolUsed:     prometheus.NewDesc(ns+"_jvm_buffer_pool_used_bytes", "Off-heap buffer pool used bytes", append(labels, "pool"), nil),
-		bufferPoolCapacity: prometheus.NewDesc(ns+"_jvm_buffer_pool_capacity_bytes", "Off-heap buffer pool capacity bytes", append(labels, "pool"), nil),
-		bufferPoolCount:    prometheus.NewDesc(ns+"_jvm_buffer_pool_count", "Number of buffers in pool", append(labels, "pool"), nil),
+		bufferPoolUsed:     prometheus.NewDesc(ns+"_jvm_buffer_pool_used_bytes", "Off-heap buffer pool used bytes", []string{labelPool}, constLabels),
+		bufferPoolCapacity: prometheus.NewDesc(ns+"_jvm_buffer_pool_capacity_bytes", "Off-heap buffer pool capacity bytes", []string{labelPool}, constLabels),
+		bufferPoolCount:    prometheus.NewDesc(ns+"_jvm_buffer_pool_count", "Number of buffers in pool", []string{labelPool}, constLabels),
 
 		// ── JVM ───────────────────────────────────────────────────
-		jvmThreadsPeak:     prometheus.NewDesc(ns+"_jvm_threads_peak", "Peak thread count", labels, nil),
-		jvmThreadsDaemon:   prometheus.NewDesc(ns+"_jvm_threads_daemon", "Daemon thread count", labels, nil),
-		jvmThreadsTotal:    prometheus.NewDesc(ns+"_jvm_threads_total", "Total live threads", labels, nil),
-		jvmClassesLoaded:   prometheus.NewDesc(ns+"_jvm_classes_loaded", "Currently loaded classes", labels, nil),
-		jvmClassesUnloaded: prometheus.NewDesc(ns+"_jvm_classes_unloaded_total", "Total unloaded classes", labels, nil),
-		jvmUptime:          prometheus.NewDesc(ns+"_jvm_uptime_seconds", "JVM uptime in seconds", labels, nil),
+		jvmThreadsPeak:     prometheus.NewDesc(ns+"_jvm_threads_peak", "Peak thread count", nil, constLabels),
+		jvmThreadsDaemon:   prometheus.NewDesc(ns+"_jvm_threads_daemon", "Daemon thread count", nil, constLabels),
+		jvmThreadsTotal:    prometheus.NewDesc(ns+"_jvm_threads_total", "Total live threads", nil, constLabels),
+		jvmClassesLoaded:   prometheus.NewDesc(ns+"_jvm_classes_loaded", "Currently loaded classes", nil, constLabels),
+		jvmClassesUnloaded: prometheus.NewDesc(ns+"_jvm_classes_unloaded_total", "Total unloaded classes", nil, constLabels),
+		jvmUptime:          prometheus.NewDesc(ns+"_jvm_uptime_seconds", "JVM uptime in seconds", nil, constLabels),
 
 		// ── JVM memory ────────────────────────────────────────────
-		jvmHeapUsed:         prometheus.NewDesc(ns+"_jvm_heap_used_bytes", "Used heap memory in bytes", labels, nil),
-		jvmHeapCommitted:    prometheus.NewDesc(ns+"_jvm_heap_committed_bytes", "Committed heap memory in bytes", labels, nil),
-		jvmHeapMax:          prometheus.NewDesc(ns+"_jvm_heap_max_bytes", "Maximum heap memory in bytes", labels, nil),
-		jvmHeapInit:         prometheus.NewDesc(ns+"_jvm_heap_init_bytes", "Initial heap memory in bytes", labels, nil),
-		jvmNonHeapUsed:      prometheus.NewDesc(ns+"_jvm_nonheap_used_bytes", "Used non-heap memory in bytes", labels, nil),
-		jvmNonHeapCommitted: prometheus.NewDesc(ns+"_jvm_nonheap_committed_bytes", "Committed non-heap memory in bytes", labels, nil),
-		jvmNonHeapMax:       prometheus.NewDesc(ns+"_jvm_nonheap_max_bytes", "Maximum non-heap memory in bytes", labels, nil),
-		jvmMemoryPoolUsed:   prometheus.NewDesc(ns+"_jvm_memory_pool_used_bytes", "Used memory in pool", append(labels, "pool"), nil),
-		jvmMemoryPoolCommit: prometheus.NewDesc(ns+"_jvm_memory_pool_committed_bytes", "Committed memory in pool", append(labels, "pool"), nil),
-		jvmMemoryPoolMax:    prometheus.NewDesc(ns+"_jvm_memory_pool_max_bytes", "Maximum memory in pool", append(labels, "pool"), nil),
+		jvmHeapUsed:         prometheus.NewDesc(ns+"_jvm_heap_used_bytes", "Used heap memory in bytes", nil, constLabels),
+		jvmHeapCommitted:    prometheus.NewDesc(ns+"_jvm_heap_committed_bytes", "Committed heap memory in bytes", nil, constLabels),
+		jvmHeapMax:          prometheus.NewDesc(ns+"_jvm_heap_max_bytes", "Maximum heap memory in bytes", nil, constLabels),
+		jvmHeapInit:         prometheus.NewDesc(ns+"_jvm_heap_init_bytes", "Initial heap memory in bytes", nil, constLabels),
+		jvmNonHeapUsed:      prometheus.NewDesc(ns+"_jvm_nonheap_used_bytes", "Used non-heap memory in bytes", nil, constLabels),
+		jvmNonHeapCommitted: prometheus.NewDesc(ns+"_jvm_nonheap_committed_bytes", "Committed non-heap memory in bytes", nil, constLabels),
+		jvmNonHeapMax:       prometheus.NewDesc(ns+"_jvm_nonheap_max_bytes", "Maximum non-heap memory in bytes", nil, constLabels),
+		jvmMemoryPoolUsed:   prometheus.NewDesc(ns+"_jvm_memory_pool_used_bytes", "Used memory in pool", []string{labelPool}, constLabels),
+		jvmMemoryPoolCommit: prometheus.NewDesc(ns+"_jvm_memory_pool_committed_bytes", "Committed memory in pool", []string{labelPool}, constLabels),
+		jvmMemoryPoolMax:    prometheus.NewDesc(ns+"_jvm_memory_pool_max_bytes", "Maximum memory in pool", []string{labelPool}, constLabels),
 
 		// ── JVM garbage collection ────────────────────────────────
-		jvmGCCount: prometheus.NewDesc(ns+"_jvm_gc_collection_count_total", "Total GC collections", append(labels, "gc"), nil),
-		jvmGCTime:  prometheus.NewDesc(ns+"_jvm_gc_collection_seconds_total", "Total time spent in GC", append(labels, "gc"), nil),
+		jvmGCCount: prometheus.NewDesc(ns+"_jvm_gc_collection_count_total", "Total GC collections", []string{"gc"}, constLabels),
+		jvmGCTime:  prometheus.NewDesc(ns+"_jvm_gc_collection_seconds_total", "Total time spent in GC", []string{"gc"}, constLabels),
 
 		// ── Operating system ──────────────────────────────────────
-		osProcessCPULoad:   prometheus.NewDesc(ns+"_jvm_process_cpu_load", "Recent CPU load of the Neo4j process (0..1)", labels, nil),
-		osSystemCPULoad:    prometheus.NewDesc(ns+"_jvm_system_cpu_load", "Recent CPU load of the host system (0..1)", labels, nil),
-		osOpenFDs:          prometheus.NewDesc(ns+"_jvm_open_file_descriptors", "Number of open file descriptors", labels, nil),
-		osMaxFDs:           prometheus.NewDesc(ns+"_jvm_max_file_descriptors", "Maximum allowed file descriptors", labels, nil),
-		osFreePhysicalMem:  prometheus.NewDesc(ns+"_jvm_free_physical_memory_bytes", "Free physical memory on the host in bytes", labels, nil),
-		osCommittedVirtMem: prometheus.NewDesc(ns+"_jvm_committed_virtual_memory_bytes", "Committed virtual memory in bytes", labels, nil),
-		osSystemLoadAvg:    prometheus.NewDesc(ns+"_jvm_system_load_average", "System load average over the last minute", labels, nil),
-		osAvailableProcs:   prometheus.NewDesc(ns+"_jvm_available_processors", "Processors available to the JVM", labels, nil),
+		osProcessCPULoad:   prometheus.NewDesc(ns+"_jvm_process_cpu_load", "Recent CPU load of the Neo4j process (0..1)", nil, constLabels),
+		osSystemCPULoad:    prometheus.NewDesc(ns+"_jvm_system_cpu_load", "Recent CPU load of the host system (0..1)", nil, constLabels),
+		osOpenFDs:          prometheus.NewDesc(ns+"_jvm_open_file_descriptors", "Number of open file descriptors", nil, constLabels),
+		osMaxFDs:           prometheus.NewDesc(ns+"_jvm_max_file_descriptors", "Maximum allowed file descriptors", nil, constLabels),
+		osFreePhysicalMem:  prometheus.NewDesc(ns+"_jvm_free_physical_memory_bytes", "Free physical memory on the host in bytes", nil, constLabels),
+		osCommittedVirtMem: prometheus.NewDesc(ns+"_jvm_committed_virtual_memory_bytes", "Committed virtual memory in bytes", nil, constLabels),
+		osSystemLoadAvg:    prometheus.NewDesc(ns+"_jvm_system_load_average", "System load average over the last minute", nil, constLabels),
+		osAvailableProcs:   prometheus.NewDesc(ns+"_jvm_available_processors", "Processors available to the JVM", nil, constLabels),
 
 		// ── GDS ───────────────────────────────────────────────────
-		gdsFreeHeap:                      prometheus.NewDesc(ns+"_gds_jvm_free_heap_bytes", "Free JVM heap bytes from GDS system monitor", labels, nil),
-		gdsTotalHeap:                     prometheus.NewDesc(ns+"_gds_jvm_total_heap_bytes", "Total JVM heap bytes from GDS system monitor", labels, nil),
-		gdsMaxHeap:                       prometheus.NewDesc(ns+"_gds_jvm_max_heap_bytes", "Max JVM heap bytes from GDS system monitor", labels, nil),
-		gdsJvmAvailableCPUCores:          prometheus.NewDesc(ns+"_gds_jvm_available_cpu_cores", "Logical CPU cores available to JVM", labels, nil),
-		gdsAvailableCPUCoresNotRequested: prometheus.NewDesc(ns+"_gds_available_cpu_cores_not_requested", "CPU cores not requested by GDS procedures", labels, nil),
-		gdsOngoingProcedures:             prometheus.NewDesc(ns+"_gds_ongoing_procedures", "Number of currently running GDS procedures", labels, nil),
-		gdsGraphMemoryBytes:              prometheus.NewDesc(ns+"_gds_graph_memory_bytes", "Memory used by GDS projected graphs", labels, nil),
-		gdsTaskMemoryBytes:               prometheus.NewDesc(ns+"_gds_task_memory_bytes", "Memory estimated for running GDS tasks", labels, nil),
+		gdsFreeHeap:                      prometheus.NewDesc(ns+"_gds_jvm_free_heap_bytes", "Free JVM heap bytes from GDS system monitor", nil, constLabels),
+		gdsTotalHeap:                     prometheus.NewDesc(ns+"_gds_jvm_total_heap_bytes", "Total JVM heap bytes from GDS system monitor", nil, constLabels),
+		gdsMaxHeap:                       prometheus.NewDesc(ns+"_gds_jvm_max_heap_bytes", "Max JVM heap bytes from GDS system monitor", nil, constLabels),
+		gdsJvmAvailableCPUCores:          prometheus.NewDesc(ns+"_gds_jvm_available_cpu_cores", "Logical CPU cores available to JVM", nil, constLabels),
+		gdsAvailableCPUCoresNotRequested: prometheus.NewDesc(ns+"_gds_available_cpu_cores_not_requested", "CPU cores not requested by GDS procedures", nil, constLabels),
+		gdsOngoingProcedures:             prometheus.NewDesc(ns+"_gds_ongoing_procedures", "Number of currently running GDS procedures", nil, constLabels),
+		gdsGraphMemoryBytes:              prometheus.NewDesc(ns+"_gds_graph_memory_bytes", "Memory used by GDS projected graphs", nil, constLabels),
+		gdsTaskMemoryBytes:               prometheus.NewDesc(ns+"_gds_task_memory_bytes", "Memory estimated for running GDS tasks", nil, constLabels),
 
 		// ── Database topology / Cypher-derived ─────────────────────
-		dbOnline:         prometheus.NewDesc(ns+"_database_online", "1 if the database currentStatus is online, else 0", append(labels, "database", "role"), nil),
-		dbTxActive:       prometheus.NewDesc(ns+"_database_transactions_active", "Currently active transactions per database", append(labels, "database"), nil),
-		poolUsedHeap:     prometheus.NewDesc(ns+"_dbms_pool_used_heap_bytes", "Heap memory used by a memory pool", append(labels, "pool", "database"), nil),
-		poolUsedNative:   prometheus.NewDesc(ns+"_dbms_pool_used_native_bytes", "Native memory used by a memory pool", append(labels, "pool", "database"), nil),
-		indexesTotal:     prometheus.NewDesc(ns+"_indexes_total", "Total indexes in the default database", labels, nil),
-		indexesOnline:    prometheus.NewDesc(ns+"_indexes_online", "Online indexes in the default database", labels, nil),
-		indexesFailed:    prometheus.NewDesc(ns+"_indexes_failed", "Failed indexes in the default database", labels, nil),
-		constraintsTotal: prometheus.NewDesc(ns+"_constraints_total", "Total constraints in the default database", labels, nil),
+		dbOnline:         prometheus.NewDesc(ns+"_database_online", "1 if the database currentStatus is online, else 0", []string{labelDatabase, "role"}, constLabels),
+		dbTxActive:       prometheus.NewDesc(ns+"_database_transactions_active", "Currently active transactions per database", []string{labelDatabase}, constLabels),
+		poolUsedHeap:     prometheus.NewDesc(ns+"_dbms_pool_used_heap_bytes", "Heap memory used by a memory pool", []string{labelPool, labelDatabase}, constLabels),
+		poolUsedNative:   prometheus.NewDesc(ns+"_dbms_pool_used_native_bytes", "Native memory used by a memory pool", []string{labelPool, labelDatabase}, constLabels),
+		indexesTotal:     prometheus.NewDesc(ns+"_indexes_total", "Total indexes in the default database", nil, constLabels),
+		indexesOnline:    prometheus.NewDesc(ns+"_indexes_online", "Online indexes in the default database", nil, constLabels),
+		indexesFailed:    prometheus.NewDesc(ns+"_indexes_failed", "Failed indexes in the default database", nil, constLabels),
+		constraintsTotal: prometheus.NewDesc(ns+"_constraints_total", "Total constraints in the default database", nil, constLabels),
 
 		// ── APOC-derived (optional) ────────────────────────────────
-		storeSize:       prometheus.NewDesc(ns+"_store_size_bytes", "On-disk store size by component (requires APOC)", append(labels, "type"), nil),
-		idsInUse:        prometheus.NewDesc(ns+"_ids_in_use", "Entity IDs in use by kind (requires APOC)", append(labels, "kind"), nil),
-		txCommitted:     prometheus.NewDesc(ns+"_transactions_committed_total", "Total committed transactions (requires APOC)", labels, nil),
-		txOpened:        prometheus.NewDesc(ns+"_transactions_opened_total", "Total opened transactions (requires APOC)", labels, nil),
-		txRolledBack:    prometheus.NewDesc(ns+"_transactions_rolled_back_total", "Total rolled-back transactions (requires APOC)", labels, nil),
-		txOpen:          prometheus.NewDesc(ns+"_transactions_open", "Currently open transactions (requires APOC)", labels, nil),
-		txPeak:          prometheus.NewDesc(ns+"_transactions_peak_concurrent", "Peak concurrent transactions (requires APOC)", labels, nil),
-		lastCommittedTx: prometheus.NewDesc(ns+"_last_committed_tx_id", "ID of the last committed transaction (requires APOC)", labels, nil),
+		storeSize:       prometheus.NewDesc(ns+"_store_size_bytes", "On-disk store size by component (requires APOC)", []string{"type"}, constLabels),
+		idsInUse:        prometheus.NewDesc(ns+"_ids_in_use", "Entity IDs in use by kind (requires APOC)", []string{"kind"}, constLabels),
+		txCommitted:     prometheus.NewDesc(ns+"_transactions_committed_total", "Total committed transactions (requires APOC)", nil, constLabels),
+		txOpened:        prometheus.NewDesc(ns+"_transactions_opened_total", "Total opened transactions (requires APOC)", nil, constLabels),
+		txRolledBack:    prometheus.NewDesc(ns+"_transactions_rolled_back_total", "Total rolled-back transactions (requires APOC)", nil, constLabels),
+		txOpen:          prometheus.NewDesc(ns+"_transactions_open", "Currently open transactions (requires APOC)", nil, constLabels),
+		txPeak:          prometheus.NewDesc(ns+"_transactions_peak_concurrent", "Peak concurrent transactions (requires APOC)", nil, constLabels),
+		lastCommittedTx: prometheus.NewDesc(ns+"_last_committed_tx_id", "ID of the last committed transaction (requires APOC)", nil, constLabels),
 
 		// ── Advanced / internal ───────────────────────────────────
-		heavyQueriesActive: prometheus.NewDesc(ns+"_dbms_heavy_queries_active", "Active queries with elapsed time > 5s", labels, nil),
-		heavyQueriesFaults: prometheus.NewDesc(ns+"_dbms_heavy_queries_page_faults", "Page faults for heavy queries", labels, nil),
+		heavyQueriesActive: prometheus.NewDesc(ns+"_dbms_heavy_queries_active", "Active queries with elapsed time > 5s", nil, constLabels),
+		heavyQueriesFaults: prometheus.NewDesc(ns+"_dbms_heavy_queries_page_faults", "Page faults for heavy queries", nil, constLabels),
 		syntheticQueryDur: prometheus.NewDesc(ns+"_synthetic_query_duration_seconds",
-			"Latency of synthetic canary query", labels, prometheus.Labels{"query": "RETURN 1"}),
+			"Latency of synthetic canary query", nil, prometheus.Labels{"target": sanitizedTarget, "query": "RETURN 1"}),
 	}
 
 	return c
 }
 
-// DetectVersion queries dbms.components() for the Neo4j version and edition and
-// probes for APOC. Safe to call repeatedly; it runs only once.
-func (c *Collector) DetectVersion(ctx context.Context) {
+// probeAPOC reports whether APOC procedures are installed on the target. Safe
+// to call repeatedly; it runs only once.
+func (c *Collector) probeAPOC(ctx context.Context) {
 	if c.detected {
 		return
 	}
 	c.detected = true
 
 	records, err := c.run.Query(ctx, systemSessionCfg(),
-		"CALL dbms.components() YIELD versions, edition RETURN versions, edition", nil)
-	if err != nil {
-		slog.Warn("version detection failed", "err", err)
-		return
-	}
-	rec, ok := single(records)
-	if !ok {
-		slog.Warn("version detection: no result")
-		return
-	}
-
-	versionsVal, _ := rec.Get("versions")
-	versionsList, ok := versionsVal.([]any)
-	if !ok || len(versionsList) == 0 {
-		slog.Warn("version detection: unexpected versions type", "type", fmt.Sprintf("%T", versionsVal))
-		return
-	}
-	versionStr, _ := versionsList[0].(string)
-
-	var major, minor int
-	_, _ = fmt.Sscanf(versionStr, "%d.%d", &major, &minor)
-
-	c.neo4jMajorVersion = major
-	c.neo4jMinorVersion = minor
-	if ed, ok := rec.Get("edition"); ok {
-		c.edition, _ = ed.(string)
-	}
-
-	c.apocAvailable = c.probeAPOC(ctx)
-
-	slog.Info("detected Neo4j instance",
-		"version", versionStr, "major", major, "minor", minor,
-		"edition", c.edition, "apoc", c.apocAvailable)
-}
-
-// probeAPOC reports whether APOC procedures are installed on the target.
-func (c *Collector) probeAPOC(ctx context.Context) bool {
-	records, err := c.run.Query(ctx, systemSessionCfg(),
 		"SHOW PROCEDURES YIELD name WHERE name STARTS WITH 'apoc.' RETURN count(*) AS c", nil)
 	if err != nil {
 		slog.Debug("APOC probe failed", "err", err)
-		return false
+		return
 	}
 	rec, ok := single(records)
 	if !ok {
-		return false
+		return
 	}
 	val, _ := rec.Get("c")
 	count, _ := jmxValue(val)
-	return count > 0
-}
-
-// Edition returns the detected Neo4j edition ("community"/"enterprise"), or ""
-// if detection has not run or failed.
-func (c *Collector) Edition() string {
-	return c.edition
-}
-
-// APOCAvailable reports whether APOC procedures were detected on the target.
-func (c *Collector) APOCAvailable() bool {
-	return c.apocAvailable
+	c.apocAvailable = count > 0
 }
 
 // Describe implements prometheus.Collector.
@@ -387,7 +338,6 @@ func (c *Collector) allDescs() []*prometheus.Desc {
 
 // Collect implements prometheus.Collector. All queries run concurrently.
 func (c *Collector) Collect(ch chan<- prometheus.Metric) {
-	targetLabel := []string{c.target}
 	ctx, cancel := context.WithTimeout(context.Background(), scrapeTimeout)
 	defer cancel()
 
@@ -395,18 +345,18 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	err := c.run.VerifyConnectivity(ctx)
 	if err != nil {
 		slog.Warn("target unreachable", "target", c.target, "err", err)
-		ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 0, targetLabel...)
+		ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 0)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 1, targetLabel...)
+	ch <- prometheus.MustNewConstMetric(c.up, prometheus.GaugeValue, 1)
 
-	c.DetectVersion(ctx)
+	c.probeAPOC(ctx)
 
 	var wg sync.WaitGroup
 
 	type namedCollector struct {
 		name string
-		fn   func(context.Context, chan<- prometheus.Metric, []string)
+		fn   func(context.Context, chan<- prometheus.Metric)
 	}
 
 	collectors := []namedCollector{
@@ -430,23 +380,21 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, nc := range collectors {
-		wg.Add(1)
-		go func(nc namedCollector) {
-			defer wg.Done()
+		wg.Go(func() {
 			phaseStart := time.Now()
-			nc.fn(ctx, ch, targetLabel)
+			nc.fn(ctx, ch)
 			ch <- prometheus.MustNewConstMetric(
 				c.scrapeDuration, prometheus.GaugeValue,
-				time.Since(phaseStart).Seconds(), append(targetLabel, nc.name)...,
+				time.Since(phaseStart).Seconds(), nc.name,
 			)
-		}(nc)
+		})
 	}
 
 	wg.Wait()
 
 	ch <- prometheus.MustNewConstMetric(
 		c.scrapeDuration, prometheus.GaugeValue,
-		time.Since(start).Seconds(), append(targetLabel, "total")...,
+		time.Since(start).Seconds(), "total",
 	)
 }
 
@@ -472,12 +420,14 @@ func jmxValue(raw any) (float64, bool) {
 	}
 }
 
+type jmxMetricConfig struct {
+	desc  *prometheus.Desc
+	mtype prometheus.ValueType
+}
+
 // jmxQueryMulti runs a JMX query returning all attributes as a map, then emits multiple metrics.
-func (c *Collector) jmxQueryMulti(ctx context.Context, ch chan<- prometheus.Metric, labels []string,
-	mbean string, attrs map[string]struct {
-		desc  *prometheus.Desc
-		mtype prometheus.ValueType
-	},
+func (c *Collector) jmxQueryMulti(ctx context.Context, ch chan<- prometheus.Metric,
+	mbean string, attrs map[string]jmxMetricConfig,
 ) {
 	records, err := c.run.Query(ctx, systemSessionCfg(),
 		jmxQueryAllAttrs, map[string]any{jmxMBeanParam: mbean})
@@ -504,6 +454,6 @@ func (c *Collector) jmxQueryMulti(ctx context.Context, ch chan<- prometheus.Metr
 		if !ok {
 			continue
 		}
-		ch <- prometheus.MustNewConstMetric(cfg.desc, cfg.mtype, fval, labels...)
+		ch <- prometheus.MustNewConstMetric(cfg.desc, cfg.mtype, fval)
 	}
 }

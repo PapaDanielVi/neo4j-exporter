@@ -1,7 +1,5 @@
 ---
 # Docker deployment tasks for neo4j-exporter
-# For production use with idempotent operations, install:
-#   ansible-galaxy collection install community.docker
 
 - name: Validate Docker is available
   ansible.builtin.stat:

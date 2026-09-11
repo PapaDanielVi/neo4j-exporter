@@ -3,12 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/collector"
@@ -30,6 +31,9 @@ var (
 func main() {
 	cfg, err := config.Parse(os.Args[1:])
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
 		fmt.Fprintf(os.Stderr, "Error parsing config: %v\n", err)
 		os.Exit(1)
 	}
@@ -46,7 +50,12 @@ func main() {
 
 	reg := prometheus.NewRegistry()
 	standaloneDriver := setupStandaloneCollector(reg, pool, cfg)
-	reg.MustRegister(newDriverPoolGauge(pool))
+	reg.MustRegister(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "neo4j_exporter_driver_pool_active",
+		Help: "Number of cached active database connection drivers",
+	}, func() float64 {
+		return float64(pool.Count())
+	}))
 
 	mux := setupHandlers(reg, pool, cfg, standaloneDriver)
 
@@ -78,33 +87,18 @@ func registerCustomQueries(reg *prometheus.Registry, driver neo4j.DriverWithCont
 	slog.Info("registered custom queries", "count", len(customQueries.Queries))
 }
 
-// neo4jDriver is the subset of neo4j.DriverWithContext we need for readiness checks.
-type neo4jDriver interface {
-	VerifyConnectivity(ctx context.Context) error
-}
-
-func setupStandaloneCollector(reg *prometheus.Registry, pool *driverpool.Pool, cfg *config.Config) neo4jDriver {
+func setupStandaloneCollector(reg *prometheus.Registry, pool *driverpool.Pool, cfg *config.Config) neo4j.DriverWithContext {
 	standaloneDriver, err := pool.Get(context.Background(), cfg.Neo4jURI, cfg.Neo4jUser, cfg.Neo4jPassword)
 	if err != nil {
 		slog.Warn("standalone driver init failed (proxy mode still available)", "err", err)
 		return nil
 	}
-	coll := collector.New(cfg.Neo4jURI, standaloneDriver)
-	reg.MustRegister(coll)
+	reg.MustRegister(collector.New(cfg.Neo4jURI, standaloneDriver))
 	registerCustomQueries(reg, standaloneDriver, cfg.CustomQueriesFile)
 	return standaloneDriver
 }
 
-func newDriverPoolGauge(pool *driverpool.Pool) prometheus.GaugeFunc {
-	return prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "neo4j_exporter_driver_pool_active",
-		Help: "Number of cached active database connection drivers",
-	}, func() float64 {
-		return float64(pool.Count())
-	})
-}
-
-func setupHandlers(reg *prometheus.Registry, pool *driverpool.Pool, cfg *config.Config, standaloneDriver neo4jDriver) *http.ServeMux {
+func setupHandlers(reg *prometheus.Registry, pool *driverpool.Pool, cfg *config.Config, standaloneDriver neo4j.DriverWithContext) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{
@@ -120,7 +114,6 @@ func setupHandlers(reg *prometheus.Registry, pool *driverpool.Pool, cfg *config.
 	})
 
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
 
@@ -148,8 +141,7 @@ func handleScrape(w http.ResponseWriter, r *http.Request, pool *driverpool.Pool,
 		return
 	}
 
-	coll := collector.New(target, driver)
-	scrapeReg.MustRegister(coll)
+	scrapeReg.MustRegister(collector.New(target, driver))
 
 	promhttp.HandlerFor(scrapeReg, promhttp.HandlerOpts{
 		ErrorHandling: promhttp.ContinueOnError,
@@ -184,7 +176,7 @@ func handleDiscovery(w http.ResponseWriter, r *http.Request, pool *driverpool.Po
 	}
 }
 
-func handleReadiness(w http.ResponseWriter, r *http.Request, driver neo4jDriver) {
+func handleReadiness(w http.ResponseWriter, r *http.Request, driver neo4j.DriverWithContext) {
 	if driver == nil {
 		http.Error(w, "no driver", http.StatusServiceUnavailable)
 		return
@@ -195,7 +187,6 @@ func handleReadiness(w http.ResponseWriter, r *http.Request, driver neo4jDriver)
 		http.Error(w, "not ready", http.StatusServiceUnavailable)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ready"))
 }
 
@@ -211,13 +202,8 @@ func serve(addr string, handler http.Handler) {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("http server error", "err", err)
-			os.Exit(1)
-		}
-	})
-
-	wg.Wait()
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Error("http server error", "err", err)
+		os.Exit(1)
+	}
 }

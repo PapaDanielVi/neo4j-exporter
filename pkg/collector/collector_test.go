@@ -103,69 +103,44 @@ func targetLabels(extra map[string]string) map[string]string {
 	return out
 }
 
-func TestDetectVersionAndEdition(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name        string
-		edition     string
-		apocCount   int64
-		wantEdition string
-		wantAPOC    bool
-	}{
-		{name: "community no apoc", edition: "community", apocCount: 0, wantEdition: "community", wantAPOC: false},
-		{name: "community with apoc", edition: "community", apocCount: 25, wantEdition: "community", wantAPOC: true},
-		{name: "enterprise with apoc", edition: "enterprise", apocCount: 25, wantEdition: "enterprise", wantAPOC: true},
+func assertMetricPresent(t *testing.T, mfs []*dto.MetricFamily, name string, labels map[string]string) {
+	t.Helper()
+	if _, ok := metricValue(mfs, name, labels); !ok {
+		t.Errorf("expected metric %q not emitted", name)
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			r := &fakeRunner{
-				stubs: []stub{
-					{
-						match:   "dbms.components",
-						records: []*neo4j.Record{rec([]string{"versions", "edition"}, []any{"5.26.0"}, tt.edition)},
-					},
-					{
-						match:   "SHOW PROCEDURES",
-						records: []*neo4j.Record{rec([]string{"c"}, tt.apocCount)},
-					},
-				},
-			}
-			c := collector.NewWithRunner(testTarget, r)
-			c.DetectVersion(context.Background())
+}
 
-			if got := c.Edition(); got != tt.wantEdition {
-				t.Errorf("Edition() = %q, want %q", got, tt.wantEdition)
-			}
-			if got := c.APOCAvailable(); got != tt.wantAPOC {
-				t.Errorf("APOCAvailable() = %v, want %v", got, tt.wantAPOC)
-			}
-		})
+func assertMetric(t *testing.T, mfs []*dto.MetricFamily, name string, labels map[string]string, want float64) {
+	t.Helper()
+	assertMetricPresent(t, mfs, name, labels)
+	if v, ok := metricValue(mfs, name, labels); ok && v != want {
+		t.Errorf("%s = %v, want %v", name, v, want)
 	}
+}
+
+func assertMetricAbsent(t *testing.T, mfs []*dto.MetricFamily, name string, labels map[string]string) {
+	t.Helper()
+	if _, ok := metricValue(mfs, name, labels); ok {
+		t.Errorf("metric %q should not be emitted", name)
+	}
+}
+
+func gatherRunner(t *testing.T, r *fakeRunner) []*dto.MetricFamily {
+	t.Helper()
+	return gather(t, collector.NewWithRunner(testTarget, r))
 }
 
 func TestCollectUnreachable(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{connErr: errors.New("connection refused")}
-	c := collector.NewWithRunner(testTarget, r)
+	mfs := gatherRunner(t, &fakeRunner{connErr: errors.New("connection refused")})
 
-	mfs := gather(t, c)
-
-	up, ok := metricValue(mfs, "neo4j_exporter_up", targetLabels(nil))
-	if !ok {
-		t.Fatal("neo4j_exporter_up not emitted")
-	}
-	if up != 0 {
-		t.Errorf("up = %v, want 0", up)
-	}
-	if _, ok := metricValue(mfs, "neo4j_jvm_threads_total", targetLabels(nil)); ok {
-		t.Error("no JVM metrics should be emitted when target is unreachable")
-	}
+	assertMetric(t, mfs, "neo4j_exporter_up", targetLabels(nil), 0)
+	assertMetricAbsent(t, mfs, "neo4j_jvm_threads_total", targetLabels(nil))
 }
 
 func TestCollectThreading(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=Threading",
@@ -177,9 +152,7 @@ func TestCollectThreading(t *testing.T) {
 				})},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	cases := map[string]float64{
 		"neo4j_jvm_threads_peak":   42,
@@ -187,20 +160,13 @@ func TestCollectThreading(t *testing.T) {
 		"neo4j_jvm_threads_total":  40,
 	}
 	for name, want := range cases {
-		got, ok := metricValue(mfs, name, targetLabels(nil))
-		if !ok {
-			t.Errorf("%s not emitted", name)
-			continue
-		}
-		if got != want {
-			t.Errorf("%s = %v, want %v", name, got, want)
-		}
+		assertMetric(t, mfs, name, targetLabels(nil), want)
 	}
 }
 
 func TestCollectNIOBufferPools(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.nio:type=BufferPool",
@@ -213,46 +179,32 @@ func TestCollectNIOBufferPools(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	want := targetLabels(map[string]string{"pool": "direct"})
-	if v, ok := metricValue(mfs, "neo4j_jvm_buffer_pool_used_bytes", want); !ok || v != 1024 {
-		t.Errorf("buffer_pool_used_bytes = %v ok=%v, want 1024", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_jvm_buffer_pool_capacity_bytes", want); !ok || v != 2048 {
-		t.Errorf("buffer_pool_capacity_bytes = %v ok=%v, want 2048", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_jvm_buffer_pool_count", want); !ok || v != 3 {
-		t.Errorf("buffer_pool_count = %v ok=%v, want 3", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_jvm_buffer_pool_used_bytes", want, 1024)
+	assertMetric(t, mfs, "neo4j_jvm_buffer_pool_capacity_bytes", want, 2048)
+	assertMetric(t, mfs, "neo4j_jvm_buffer_pool_count", want, 3)
 }
 
 func TestCollectHeavyTransactions(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match:   "SHOW TRANSACTIONS",
 				records: []*neo4j.Record{rec([]string{"heavy_count", "total_faults"}, int64(2), int64(15))},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
-	if v, ok := metricValue(mfs, "neo4j_dbms_heavy_queries_active", targetLabels(nil)); !ok || v != 2 {
-		t.Errorf("heavy_queries_active = %v ok=%v, want 2", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_dbms_heavy_queries_page_faults", targetLabels(nil)); !ok || v != 15 {
-		t.Errorf("heavy_queries_page_faults = %v ok=%v, want 15", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_dbms_heavy_queries_active", targetLabels(nil), 2)
+	assertMetric(t, mfs, "neo4j_dbms_heavy_queries_page_faults", targetLabels(nil), 15)
 }
 
 func TestCollectMemory(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=Memory",
@@ -266,9 +218,7 @@ func TestCollectMemory(t *testing.T) {
 				})},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	cases := map[string]float64{
 		"neo4j_jvm_heap_used_bytes":         500,
@@ -280,9 +230,7 @@ func TestCollectMemory(t *testing.T) {
 		"neo4j_jvm_nonheap_max_bytes":       -1,
 	}
 	for name, want := range cases {
-		if got, ok := metricValue(mfs, name, targetLabels(nil)); !ok || got != want {
-			t.Errorf("%s = %v ok=%v, want %v", name, got, ok, want)
-		}
+		assertMetric(t, mfs, name, targetLabels(nil), want)
 	}
 }
 
@@ -291,7 +239,7 @@ func TestCollectMemoryWrappedComposite(t *testing.T) {
 	// dbms.queryJmx reports composite attributes as
 	// {"value": {"properties": {...}}}, which is how a real Neo4j instance
 	// returns HeapMemoryUsage.
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=Memory",
@@ -306,21 +254,15 @@ func TestCollectMemoryWrappedComposite(t *testing.T) {
 				})},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
-	if v, ok := metricValue(mfs, "neo4j_jvm_heap_used_bytes", targetLabels(nil)); !ok || v != 600 {
-		t.Errorf("heap_used_bytes = %v ok=%v, want 600", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_jvm_heap_max_bytes", targetLabels(nil)); !ok || v != 1200 {
-		t.Errorf("heap_max_bytes = %v ok=%v, want 1200", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_jvm_heap_used_bytes", targetLabels(nil), 600)
+	assertMetric(t, mfs, "neo4j_jvm_heap_max_bytes", targetLabels(nil), 1200)
 }
 
 func TestCollectMemoryPools(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=MemoryPool",
@@ -330,22 +272,16 @@ func TestCollectMemoryPools(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	want := targetLabels(map[string]string{"pool": "G1 Eden Space"})
-	if v, ok := metricValue(mfs, "neo4j_jvm_memory_pool_used_bytes", want); !ok || v != 64 {
-		t.Errorf("memory_pool_used_bytes = %v ok=%v, want 64", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_jvm_memory_pool_max_bytes", want); !ok || v != 256 {
-		t.Errorf("memory_pool_max_bytes = %v ok=%v, want 256", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_jvm_memory_pool_used_bytes", want, 64)
+	assertMetric(t, mfs, "neo4j_jvm_memory_pool_max_bytes", want, 256)
 }
 
 func TestCollectGC(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=GarbageCollector",
@@ -355,23 +291,16 @@ func TestCollectGC(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	want := targetLabels(map[string]string{"gc": "G1 Young Generation"})
-	if v, ok := metricValue(mfs, "neo4j_jvm_gc_collection_count_total", want); !ok || v != 12 {
-		t.Errorf("gc_collection_count_total = %v ok=%v, want 12", v, ok)
-	}
-	// 3500ms must be reported as 3.5 seconds.
-	if v, ok := metricValue(mfs, "neo4j_jvm_gc_collection_seconds_total", want); !ok || v != 3.5 {
-		t.Errorf("gc_collection_seconds_total = %v ok=%v, want 3.5", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_jvm_gc_collection_count_total", want, 12)
+	assertMetric(t, mfs, "neo4j_jvm_gc_collection_seconds_total", want, 3.5)
 }
 
 func TestCollectOS(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "java.lang:type=OperatingSystem",
@@ -383,9 +312,7 @@ func TestCollectOS(t *testing.T) {
 				})},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	cases := map[string]float64{
 		"neo4j_jvm_process_cpu_load":      0.25,
@@ -394,15 +321,13 @@ func TestCollectOS(t *testing.T) {
 		"neo4j_jvm_available_processors":  8,
 	}
 	for name, want := range cases {
-		if got, ok := metricValue(mfs, name, targetLabels(nil)); !ok || got != want {
-			t.Errorf("%s = %v ok=%v, want %v", name, got, ok, want)
-		}
+		assertMetric(t, mfs, name, targetLabels(nil), want)
 	}
 }
 
 func TestCollectDatabases(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "SHOW DATABASES",
@@ -413,21 +338,15 @@ func TestCollectDatabases(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
-	if v, ok := metricValue(mfs, "neo4j_database_online", targetLabels(map[string]string{"database": "neo4j", "role": "primary"})); !ok || v != 1 {
-		t.Errorf("database_online{neo4j} = %v ok=%v, want 1", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_database_online", targetLabels(map[string]string{"database": "stopped", "role": "primary"})); !ok || v != 0 {
-		t.Errorf("database_online{stopped} = %v ok=%v, want 0", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_database_online", targetLabels(map[string]string{"database": "neo4j", "role": "primary"}), 1)
+	assertMetric(t, mfs, "neo4j_database_online", targetLabels(map[string]string{"database": "stopped", "role": "primary"}), 0)
 }
 
 func TestCollectTransactionsByDatabase(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "SHOW TRANSACTIONS YIELD database",
@@ -437,18 +356,14 @@ func TestCollectTransactionsByDatabase(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
-	if v, ok := metricValue(mfs, "neo4j_database_transactions_active", targetLabels(map[string]string{"database": "neo4j"})); !ok || v != 3 {
-		t.Errorf("transactions_active{neo4j} = %v ok=%v, want 3", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_database_transactions_active", targetLabels(map[string]string{"database": "neo4j"}), 3)
 }
 
 func TestCollectPools(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "dbms.listPools",
@@ -458,22 +373,16 @@ func TestCollectPools(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	want := targetLabels(map[string]string{"pool": "transaction", "database": "neo4j"})
-	if v, ok := metricValue(mfs, "neo4j_dbms_pool_used_heap_bytes", want); !ok || v != 2048 {
-		t.Errorf("pool_used_heap_bytes = %v ok=%v, want 2048", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_dbms_pool_used_native_bytes", want); !ok || v != 4096 {
-		t.Errorf("pool_used_native_bytes = %v ok=%v, want 4096", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_dbms_pool_used_heap_bytes", want, 2048)
+	assertMetric(t, mfs, "neo4j_dbms_pool_used_native_bytes", want, 4096)
 }
 
 func TestCollectIndexesAndConstraints(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "SHOW INDEXES",
@@ -492,9 +401,7 @@ func TestCollectIndexesAndConstraints(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
 	cases := map[string]float64{
 		"neo4j_indexes_total":     4,
@@ -503,16 +410,13 @@ func TestCollectIndexesAndConstraints(t *testing.T) {
 		"neo4j_constraints_total": 2,
 	}
 	for name, want := range cases {
-		if got, ok := metricValue(mfs, name, targetLabels(nil)); !ok || got != want {
-			t.Errorf("%s = %v ok=%v, want %v", name, got, ok, want)
-		}
+		assertMetric(t, mfs, name, targetLabels(nil), want)
 	}
 }
 
-// apocStubs returns the detection and monitor stubs for an APOC-enabled instance.
+// apocStubs returns the monitor stubs for an APOC-enabled instance.
 func apocStubs() []stub {
 	return []stub{
-		{match: "dbms.components", records: []*neo4j.Record{rec([]string{"versions", "edition"}, []any{"5.26.0"}, "community")}},
 		{match: "SHOW PROCEDURES", records: []*neo4j.Record{rec([]string{"c"}, int64(50))}},
 		{match: "apoc.monitor.store", records: []*neo4j.Record{rec(
 			[]string{"nodeStoreSize", "relStoreSize", "propStoreSize", "totalStoreSize"},
@@ -528,9 +432,7 @@ func apocStubs() []stub {
 
 func TestCollectAPOCMetrics(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{stubs: apocStubs()}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	mfs := gatherRunner(t, &fakeRunner{stubs: apocStubs()})
 
 	cases := []struct {
 		name   string
@@ -549,9 +451,7 @@ func TestCollectAPOCMetrics(t *testing.T) {
 		{"neo4j_last_committed_tx_id", nil, 12345},
 	}
 	for _, tc := range cases {
-		if got, ok := metricValue(mfs, tc.name, targetLabels(tc.labels)); !ok || got != tc.want {
-			t.Errorf("%s%v = %v ok=%v, want %v", tc.name, tc.labels, got, ok, tc.want)
-		}
+		assertMetric(t, mfs, tc.name, targetLabels(tc.labels), tc.want)
 	}
 }
 
@@ -567,21 +467,15 @@ func TestCollectAPOCSkippedWhenAbsent(t *testing.T) {
 		}
 		filtered = append(filtered, s)
 	}
-	r := &fakeRunner{stubs: filtered}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	mfs := gatherRunner(t, &fakeRunner{stubs: filtered})
 
-	if _, ok := metricValue(mfs, "neo4j_store_size_bytes", targetLabels(map[string]string{"type": "node"})); ok {
-		t.Error("store_size_bytes should not be emitted when APOC is absent")
-	}
-	if _, ok := metricValue(mfs, "neo4j_transactions_committed_total", targetLabels(nil)); ok {
-		t.Error("transactions_committed_total should not be emitted when APOC is absent")
-	}
+	assertMetricAbsent(t, mfs, "neo4j_store_size_bytes", targetLabels(map[string]string{"type": "node"}))
+	assertMetricAbsent(t, mfs, "neo4j_transactions_committed_total", targetLabels(nil))
 }
 
 func TestCollectGDSMemorySumsMultipleUsers(t *testing.T) {
 	t.Parallel()
-	r := &fakeRunner{
+	mfs := gatherRunner(t, &fakeRunner{
 		stubs: []stub{
 			{
 				match: "gds.systemMonitor",
@@ -599,20 +493,10 @@ func TestCollectGDSMemorySumsMultipleUsers(t *testing.T) {
 				},
 			},
 		},
-	}
-	c := collector.NewWithRunner(testTarget, r)
-	mfs := gather(t, c)
+	})
 
-	if v, ok := metricValue(mfs, "neo4j_gds_jvm_free_heap_bytes", targetLabels(nil)); !ok || v != 100 {
-		t.Errorf("gds_jvm_free_heap_bytes = %v ok=%v, want 100", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_gds_ongoing_procedures", targetLabels(nil)); !ok || v != 1 {
-		t.Errorf("gds_ongoing_procedures = %v ok=%v, want 1", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_gds_graph_memory_bytes", targetLabels(nil)); !ok || v != 30 {
-		t.Errorf("gds_graph_memory_bytes = %v ok=%v, want 30 (10+20)", v, ok)
-	}
-	if v, ok := metricValue(mfs, "neo4j_gds_task_memory_bytes", targetLabels(nil)); !ok || v != 12 {
-		t.Errorf("gds_task_memory_bytes = %v ok=%v, want 12 (5+7)", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_gds_jvm_free_heap_bytes", targetLabels(nil), 100)
+	assertMetric(t, mfs, "neo4j_gds_ongoing_procedures", targetLabels(nil), 1)
+	assertMetric(t, mfs, "neo4j_gds_graph_memory_bytes", targetLabels(nil), 30)
+	assertMetric(t, mfs, "neo4j_gds_task_memory_bytes", targetLabels(nil), 12)
 }

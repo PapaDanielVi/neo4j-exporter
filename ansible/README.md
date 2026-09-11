@@ -5,9 +5,6 @@ This directory contains an Ansible playbook for deploying neo4j-exporter to prod
 ## Quick Start
 
 ```bash
-# Install dependencies
-ansible-galaxy collection install community.docker -p ./collections
-
 # Configure inventory
 cp inventory.ini inventory.ini.local
 # Edit inventory.ini.local with your target hosts

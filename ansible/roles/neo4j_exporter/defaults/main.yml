@@ -27,7 +27,6 @@ neo4j_exporter_log_json: false
 neo4j_exporter_docker_image: ghcr.io/PapaDanielVi/neo4j-exporter:latest
 neo4j_exporter_docker_container_name: neo4j-exporter
 neo4j_exporter_docker_restart_policy: unless-stopped
-neo4j_exporter_docker_network_mode: bridge
 
 # Systemd service settings
 neo4j_exporter_systemd_restart: always

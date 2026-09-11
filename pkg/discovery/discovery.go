@@ -18,24 +18,18 @@ type Target struct {
 // Discover queries the primary Neo4j instance for all databases and returns
 // a list of scrape targets — one per database.
 func Discover(ctx context.Context, driver neo4j.DriverWithContext, exporterAddr string) ([]Target, error) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{
-		AccessMode:   neo4j.AccessModeRead,
-		DatabaseName: "system",
-	})
-	defer session.Close(ctx)
-
-	result, err := session.Run(ctx, "SHOW DATABASES YIELD name, currentStatus", nil)
+	result, err := neo4j.ExecuteQuery[*neo4j.EagerResult](ctx, driver,
+		"SHOW DATABASES YIELD name, currentStatus",
+		nil,
+		neo4j.EagerResultTransformer,
+		neo4j.ExecuteQueryWithDatabase("system"),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("running SHOW DATABASES: %w", err)
 	}
 
-	records, err := result.Collect(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("collecting database records: %w", err)
-	}
-
 	var targets []Target
-	for _, rec := range records {
+	for _, rec := range result.Records {
 		nameVal, _ := rec.Get("name")
 		statusVal, _ := rec.Get("currentStatus")
 		dbName, ok := nameVal.(string)

@@ -113,5 +113,3 @@ golangci-lint run
 - `examples/custom_queries.yaml` — example YAML custom queries
 - `examples/grafana-dashboard.json` — pre-built Grafana dashboard for Neo4j metrics
 - `examples/docker-compose.neo4j.yml` — Docker Compose with Neo4j 5.x
-- `examples/docker-compose.neo4j4.yml` — Docker Compose with Neo4j 4.x
-- `examples/metrics_analysis.md` — analysis of which JMX metrics work on Neo4j 5.x

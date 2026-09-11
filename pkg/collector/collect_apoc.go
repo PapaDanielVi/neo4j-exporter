@@ -10,16 +10,16 @@ import (
 
 // collectAPOC emits metrics derived from APOC monitor procedures. It is a no-op
 // when APOC was not detected on the target.
-func (c *Collector) collectAPOC(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectAPOC(ctx context.Context, ch chan<- prometheus.Metric) {
 	if !c.apocAvailable {
 		return
 	}
-	c.collectAPOCStore(ctx, ch, labels)
-	c.collectAPOCIDs(ctx, ch, labels)
-	c.collectAPOCTx(ctx, ch, labels)
+	c.collectAPOCStore(ctx, ch)
+	c.collectAPOCIDs(ctx, ch)
+	c.collectAPOCTx(ctx, ch)
 }
 
-func (c *Collector) collectAPOCStore(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectAPOCStore(ctx context.Context, ch chan<- prometheus.Metric) {
 	rec, ok := c.apocSingle(ctx, "CALL apoc.monitor.store()")
 	if !ok {
 		return
@@ -35,12 +35,12 @@ func (c *Collector) collectAPOCStore(ctx context.Context, ch chan<- prometheus.M
 		"totalStoreSize":  "total",
 	} {
 		if v, ok := jmxValue(recordValue(rec, col)); ok {
-			ch <- prometheus.MustNewConstMetric(c.storeSize, prometheus.GaugeValue, v, append(append([]string{}, labels...), typ)...)
+			ch <- prometheus.MustNewConstMetric(c.storeSize, prometheus.GaugeValue, v, typ)
 		}
 	}
 }
 
-func (c *Collector) collectAPOCIDs(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectAPOCIDs(ctx context.Context, ch chan<- prometheus.Metric) {
 	rec, ok := c.apocSingle(ctx, "CALL apoc.monitor.ids()")
 	if !ok {
 		return
@@ -52,19 +52,19 @@ func (c *Collector) collectAPOCIDs(ctx context.Context, ch chan<- prometheus.Met
 		"relTypeIds": "relationship_type",
 	} {
 		if v, ok := jmxValue(recordValue(rec, col)); ok {
-			ch <- prometheus.MustNewConstMetric(c.idsInUse, prometheus.GaugeValue, v, append(append([]string{}, labels...), kind)...)
+			ch <- prometheus.MustNewConstMetric(c.idsInUse, prometheus.GaugeValue, v, kind)
 		}
 	}
 }
 
-func (c *Collector) collectAPOCTx(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectAPOCTx(ctx context.Context, ch chan<- prometheus.Metric) {
 	rec, ok := c.apocSingle(ctx, "CALL apoc.monitor.tx()")
 	if !ok {
 		return
 	}
 	emit := func(col string, desc *prometheus.Desc, mtype prometheus.ValueType) {
 		if v, ok := jmxValue(recordValue(rec, col)); ok {
-			ch <- prometheus.MustNewConstMetric(desc, mtype, v, labels...)
+			ch <- prometheus.MustNewConstMetric(desc, mtype, v)
 		}
 	}
 	emit("totalTx", c.txCommitted, prometheus.CounterValue)

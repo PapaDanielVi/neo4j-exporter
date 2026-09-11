@@ -1,9 +1,6 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
 
-ARG TARGETOS
-ARG TARGETARCH
-
 WORKDIR /app
 
 RUN apk add --no-cache git ca-certificates

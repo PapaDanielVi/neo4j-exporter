@@ -27,8 +27,6 @@ type Pool struct {
 type poolEntry struct {
 	driver   neo4j.DriverWithContext
 	lastUsed time.Time
-	user     string
-	password string
 }
 
 // New creates a Pool and starts the background reaper goroutine.
@@ -77,8 +75,6 @@ func (p *Pool) Get(ctx context.Context, uri, user, password string) (neo4j.Drive
 	p.drivers[uri] = &poolEntry{
 		driver:   driver,
 		lastUsed: time.Now(),
-		user:     user,
-		password: password,
 	}
 	p.mu.Unlock()
 

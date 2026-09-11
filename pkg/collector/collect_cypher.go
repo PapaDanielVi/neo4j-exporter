@@ -15,7 +15,7 @@ const (
 
 // ── Database topology (SHOW DATABASES) ──────────────────────────────
 
-func (c *Collector) collectDatabases(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectDatabases(ctx context.Context, ch chan<- prometheus.Metric) {
 	records, err := c.run.Query(ctx, systemSessionCfg(),
 		"SHOW DATABASES YIELD name, currentStatus, role RETURN name, currentStatus, role", nil)
 	if err != nil {
@@ -33,14 +33,13 @@ func (c *Collector) collectDatabases(ctx context.Context, ch chan<- prometheus.M
 		if status == statusOnline {
 			online = 1
 		}
-		dbLabels := append(append([]string{}, labels...), name, role)
-		ch <- prometheus.MustNewConstMetric(c.dbOnline, prometheus.GaugeValue, online, dbLabels...)
+		ch <- prometheus.MustNewConstMetric(c.dbOnline, prometheus.GaugeValue, online, name, role)
 	}
 }
 
 // ── Active transactions per database (SHOW TRANSACTIONS) ─────────────
 
-func (c *Collector) collectTransactionsByDatabase(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectTransactionsByDatabase(ctx context.Context, ch chan<- prometheus.Metric) {
 	records, err := c.run.Query(ctx, systemSessionCfg(),
 		"SHOW TRANSACTIONS YIELD database RETURN database, count(*) AS active", nil)
 	if err != nil {
@@ -56,14 +55,13 @@ func (c *Collector) collectTransactionsByDatabase(ctx context.Context, ch chan<-
 		if !ok {
 			continue
 		}
-		dbLabels := append(append([]string{}, labels...), db)
-		ch <- prometheus.MustNewConstMetric(c.dbTxActive, prometheus.GaugeValue, active, dbLabels...)
+		ch <- prometheus.MustNewConstMetric(c.dbTxActive, prometheus.GaugeValue, active, db)
 	}
 }
 
 // ── Memory pools (dbms.listPools) ───────────────────────────────────
 
-func (c *Collector) collectPools(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectPools(ctx context.Context, ch chan<- prometheus.Metric) {
 	records, err := c.run.Query(ctx, readSessionCfg(), "CALL dbms.listPools()", nil)
 	if err != nil {
 		slog.Debug("dbms.listPools() failed", "err", err)
@@ -75,20 +73,19 @@ func (c *Collector) collectPools(ctx context.Context, ch chan<- prometheus.Metri
 			continue
 		}
 		db := recordString(rec, "databaseName")
-		poolLabels := append(append([]string{}, labels...), pool, db)
 		// Only the *Bytes columns are numeric; human-readable columns are skipped by jmxValue.
 		if v, ok := jmxValue(recordValue(rec, "heapMemoryUsedBytes")); ok {
-			ch <- prometheus.MustNewConstMetric(c.poolUsedHeap, prometheus.GaugeValue, v, poolLabels...)
+			ch <- prometheus.MustNewConstMetric(c.poolUsedHeap, prometheus.GaugeValue, v, pool, db)
 		}
 		if v, ok := jmxValue(recordValue(rec, "nativeMemoryUsedBytes")); ok {
-			ch <- prometheus.MustNewConstMetric(c.poolUsedNative, prometheus.GaugeValue, v, poolLabels...)
+			ch <- prometheus.MustNewConstMetric(c.poolUsedNative, prometheus.GaugeValue, v, pool, db)
 		}
 	}
 }
 
 // ── Index health (SHOW INDEXES) ─────────────────────────────────────
 
-func (c *Collector) collectIndexes(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectIndexes(ctx context.Context, ch chan<- prometheus.Metric) {
 	records, err := c.run.Query(ctx, readSessionCfg(), "SHOW INDEXES YIELD state RETURN state", nil)
 	if err != nil {
 		slog.Debug("SHOW INDEXES failed", "err", err)
@@ -104,18 +101,18 @@ func (c *Collector) collectIndexes(ctx context.Context, ch chan<- prometheus.Met
 			failed++
 		}
 	}
-	ch <- prometheus.MustNewConstMetric(c.indexesTotal, prometheus.GaugeValue, total, labels...)
-	ch <- prometheus.MustNewConstMetric(c.indexesOnline, prometheus.GaugeValue, online, labels...)
-	ch <- prometheus.MustNewConstMetric(c.indexesFailed, prometheus.GaugeValue, failed, labels...)
+	ch <- prometheus.MustNewConstMetric(c.indexesTotal, prometheus.GaugeValue, total)
+	ch <- prometheus.MustNewConstMetric(c.indexesOnline, prometheus.GaugeValue, online)
+	ch <- prometheus.MustNewConstMetric(c.indexesFailed, prometheus.GaugeValue, failed)
 }
 
 // ── Constraint count (SHOW CONSTRAINTS) ─────────────────────────────
 
-func (c *Collector) collectConstraints(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectConstraints(ctx context.Context, ch chan<- prometheus.Metric) {
 	records, err := c.run.Query(ctx, readSessionCfg(), "SHOW CONSTRAINTS YIELD name RETURN name", nil)
 	if err != nil {
 		slog.Debug("SHOW CONSTRAINTS failed", "err", err)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(c.constraintsTotal, prometheus.GaugeValue, float64(len(records)), labels...)
+	ch <- prometheus.MustNewConstMetric(c.constraintsTotal, prometheus.GaugeValue, float64(len(records)))
 }
