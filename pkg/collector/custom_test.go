@@ -26,9 +26,7 @@ func TestCustomCollectorScalar(t *testing.T) {
 	cc := collector.NewCustomCollectorWithRunner(cq, r)
 	mfs := gather(t, cc)
 
-	if v, ok := metricValue(mfs, "neo4j_custom_suspended_users_total", map[string]string{"group": "topology"}); !ok || v != 7 {
-		t.Errorf("custom metric = %v ok=%v, want 7", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_custom_suspended_users_total", map[string]string{"group": "topology"}, 7)
 }
 
 func TestCustomCollectorExplicitValueColumn(t *testing.T) {
@@ -50,7 +48,5 @@ func TestCustomCollectorExplicitValueColumn(t *testing.T) {
 	cc := collector.NewCustomCollectorWithRunner(cq, r)
 	mfs := gather(t, cc)
 
-	if v, ok := metricValue(mfs, "neo4j_custom_node_total", nil); !ok || v != 42 {
-		t.Errorf("custom metric = %v ok=%v, want 42", v, ok)
-	}
+	assertMetric(t, mfs, "neo4j_custom_node_total", nil, 42)
 }

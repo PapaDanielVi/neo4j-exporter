@@ -11,7 +11,7 @@ import (
 
 // ── GDS (Graph Data Science) ───────────────────────────────────────
 
-func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric) {
 	// gds.systemMonitor() — returns heap, CPU, and ongoing procedures.
 	records, err := c.run.Query(ctx, readSessionCfg(), "CALL gds.systemMonitor() YIELD freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, ongoingGdsProcedures RETURN freeHeap, totalHeap, maxHeap, jvmAvailableCpuCores, availableCpuCoresNotRequested, size(ongoingGdsProcedures) AS ongoingCount", nil)
 	if err != nil {
@@ -23,23 +23,22 @@ func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric,
 		return
 	}
 
-	heapMetrics := map[string]*prometheus.Desc{
-		"freeHeap":                      c.gdsFreeHeap,
-		"totalHeap":                     c.gdsTotalHeap,
-		"maxHeap":                       c.gdsMaxHeap,
-		"jvmAvailableCpuCores":          c.gdsJvmAvailableCPUCores,
-		"availableCpuCoresNotRequested": c.gdsAvailableCPUCoresNotRequested,
+	metrics := []struct {
+		key  string
+		desc *prometheus.Desc
+	}{
+		{"freeHeap", c.gdsFreeHeap},
+		{"totalHeap", c.gdsTotalHeap},
+		{"maxHeap", c.gdsMaxHeap},
+		{"jvmAvailableCpuCores", c.gdsJvmAvailableCPUCores},
+		{"availableCpuCoresNotRequested", c.gdsAvailableCPUCoresNotRequested},
+		{"ongoingCount", c.gdsOngoingProcedures},
 	}
-	for key, desc := range heapMetrics {
-		if val, ok := rec.Get(key); ok && val != nil {
+	for _, m := range metrics {
+		if val, ok := rec.Get(m.key); ok && val != nil {
 			if fval, ok := jmxValue(val); ok {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, fval, labels...)
+				ch <- prometheus.MustNewConstMetric(m.desc, prometheus.GaugeValue, fval)
 			}
-		}
-	}
-	if val, ok := rec.Get("ongoingCount"); ok && val != nil {
-		if fval, ok := jmxValue(val); ok {
-			ch <- prometheus.MustNewConstMetric(c.gdsOngoingProcedures, prometheus.GaugeValue, fval, labels...)
 		}
 	}
 
@@ -51,12 +50,12 @@ func (c *Collector) collectGDS(ctx context.Context, ch chan<- prometheus.Metric,
 		slog.Debug("gds.memory.summary() not available", "err", err)
 		return
 	}
-	c.emitMemoryMetrics(ch, summaryRecords, labels)
+	c.emitMemoryMetrics(ch, summaryRecords)
 }
 
 // ── Heavy transactions ─────────────────────────────────────────────
 
-func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prometheus.Metric) {
 	heavyTxQuery := "SHOW TRANSACTIONS " +
 		"YIELD transactionId, elapsedTime, pageFaults " +
 		"WHERE elapsedTime.milliseconds > 5000 " +
@@ -70,32 +69,36 @@ func (c *Collector) collectHeavyTransactions(ctx context.Context, ch chan<- prom
 	if !ok {
 		return
 	}
-	countVal, _ := rec.Get("heavy_count")
-	faultsVal, _ := rec.Get("total_faults")
-	var count, faults float64
-	if v, ok := countVal.(int64); ok {
-		count = float64(v)
+
+	metrics := []struct {
+		key  string
+		desc *prometheus.Desc
+	}{
+		{"heavy_count", c.heavyQueriesActive},
+		{"total_faults", c.heavyQueriesFaults},
 	}
-	if v, ok := faultsVal.(int64); ok {
-		faults = float64(v)
+	for _, m := range metrics {
+		if val, ok := rec.Get(m.key); ok && val != nil {
+			if f, ok := jmxValue(val); ok {
+				ch <- prometheus.MustNewConstMetric(m.desc, prometheus.GaugeValue, f)
+			}
+		}
 	}
-	ch <- prometheus.MustNewConstMetric(c.heavyQueriesActive, prometheus.GaugeValue, count, labels...)
-	ch <- prometheus.MustNewConstMetric(c.heavyQueriesFaults, prometheus.GaugeValue, faults, labels...)
 }
 
 // ── Synthetic canary ───────────────────────────────────────────────
 
-func (c *Collector) collectSynthetic(ctx context.Context, ch chan<- prometheus.Metric, labels []string) {
+func (c *Collector) collectSynthetic(ctx context.Context, ch chan<- prometheus.Metric) {
 	start := time.Now()
 	_, err := c.run.Query(ctx, systemSessionCfg(), "CALL dbms.components() YIELD name RETURN name LIMIT 1", nil)
 	if err != nil {
 		slog.Warn("synthetic query failed", "err", err)
 		return
 	}
-	ch <- prometheus.MustNewConstMetric(c.syntheticQueryDur, prometheus.GaugeValue, time.Since(start).Seconds(), labels...)
+	ch <- prometheus.MustNewConstMetric(c.syntheticQueryDur, prometheus.GaugeValue, time.Since(start).Seconds())
 }
 
-func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, records []*neo4j.Record, labels []string) {
+func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, records []*neo4j.Record) {
 	var totalGraphMem, totalTaskMem float64
 	for _, sr := range records {
 		if v, ok := sr.Get("totalGraphsMemory"); ok && v != nil {
@@ -109,6 +112,13 @@ func (c *Collector) emitMemoryMetrics(ch chan<- prometheus.Metric, records []*ne
 			}
 		}
 	}
-	ch <- prometheus.MustNewConstMetric(c.gdsGraphMemoryBytes, prometheus.GaugeValue, totalGraphMem, labels...)
-	ch <- prometheus.MustNewConstMetric(c.gdsTaskMemoryBytes, prometheus.GaugeValue, totalTaskMem, labels...)
+	for _, m := range []struct {
+		desc *prometheus.Desc
+		val  float64
+	}{
+		{c.gdsGraphMemoryBytes, totalGraphMem},
+		{c.gdsTaskMemoryBytes, totalTaskMem},
+	} {
+		ch <- prometheus.MustNewConstMetric(m.desc, prometheus.GaugeValue, m.val)
+	}
 }

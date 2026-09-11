@@ -65,25 +65,7 @@ function Install-Binary {
         # Try 7-zip as fallback
         7z x $tmpFile -o$tmpDir -y | Out-Null
     } else {
-        # PowerShell 7+ has Compress-Archive but needs tar support
-        try {
-            # Download and use the bundled Expand-TarGz function
-            $sourceStream = [System.IO.Compression.GzipStream]::new(
-                [System.IO.File]::OpenRead($tmpFile),
-                [System.IO.Compression.CompressionMode]::Decompress
-            )
-            $tarStream = [System.IO.MemoryStream]::new()
-            $sourceStream.CopyTo($tarStream)
-            $sourceStream.Dispose()
-            $tarStream.Position = 0
-
-            # Note: Full tar extraction requires additional logic or external tools
-            # PowerShell 7+ recommended: https://github.com/PowerShell/PowerShell/releases
-            throw "No tar extraction tool found. Install PowerShell 7+, 7-Zip, or use Windows 10+ tar.exe."
-        } catch {
-            Write-Error "No tar extraction tool found. Please install PowerShell 7+, 7-Zip, or use Windows 10+ tar.exe."
-            exit 1
-        }
+        throw "No tar extraction tool found. Install PowerShell 7+, 7-Zip, or use Windows 10+ tar.exe."
     }
 
     # Create install directory if it doesn't exist

@@ -11,7 +11,3 @@
     name: "{{ neo4j_exporter_service_name }}"
     state: restarted
   listen: Restart neo4j-exporter service
-
-- name: Restart neo4j-exporter container
-  ansible.builtin.shell: docker restart {{ neo4j_exporter_docker_container_name }}
-  listen: Restart neo4j-exporter container

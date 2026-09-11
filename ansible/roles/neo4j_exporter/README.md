@@ -17,9 +17,6 @@ Ansible support is provided for production-ready deployments on traditional infr
 git clone https://github.com/PapaDanielVi/neo4j-exporter.git
 cd neo4j-exporter/ansible
 
-# Install required collections (if not already installed)
-ansible-galaxy collection install community.docker geerlingguy.docker
-
 # Verify Ansible is working
 ansible --version
 ```

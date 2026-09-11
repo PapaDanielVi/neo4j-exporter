@@ -1,47 +1,38 @@
 //go:build integration
 
-// Package collector_test integration suite. Boots a real Neo4j Community
-// container and asserts the collector produces a known set of metric families.
+// Package collector_test integration suite. Connects to a running Neo4j
+// instance (via GitHub Actions service or examples/docker-compose.neo4j.yml)
+// and asserts the collector produces a known set of metric families.
 // Run with: go test -tags integration ./pkg/collector/
 package collector_test
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/PapaDanielVi/neo4j-exporter/pkg/collector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	tcneo4j "github.com/testcontainers/testcontainers-go/modules/neo4j"
 )
 
-const (
-	integrationImage    = "neo4j:5-community"
-	integrationPassword = "testpassword123"
-)
+const defaultIntegrationPassword = "testpassword123"
 
 func TestIntegrationCommunityMetrics(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	ctr, err := tcneo4j.Run(ctx, integrationImage,
-		tcneo4j.WithAdminPassword(integrationPassword))
-	if err != nil {
-		t.Fatalf("starting neo4j container: %v", err)
+	boltURL := os.Getenv("NEO4J_BOLT_URL")
+	if boltURL == "" {
+		boltURL = "bolt://localhost:7687"
 	}
-	t.Cleanup(func() {
-		if err := ctr.Terminate(context.Background()); err != nil {
-			t.Logf("terminating container: %v", err)
-		}
-	})
-
-	boltURL, err := ctr.BoltUrl(ctx)
-	if err != nil {
-		t.Fatalf("getting bolt url: %v", err)
+	password := os.Getenv("NEO4J_PASSWORD")
+	if password == "" {
+		password = defaultIntegrationPassword
 	}
 
 	driver, err := neo4j.NewDriverWithContext(boltURL,
-		neo4j.BasicAuth("neo4j", integrationPassword, ""))
+		neo4j.BasicAuth("neo4j", password, ""))
 	if err != nil {
 		t.Fatalf("creating driver: %v", err)
 	}
@@ -70,12 +61,9 @@ func TestIntegrationCommunityMetrics(t *testing.T) {
 		"neo4j_jvm_open_file_descriptors",
 	}
 	for _, name := range wantFamilies {
-		if _, ok := metricValue(mfs, name, labels); !ok {
-			t.Errorf("expected metric family %q not emitted", name)
-		}
+		assertMetricPresent(t, mfs, name, labels)
 	}
 
-	if up, ok := metricValue(mfs, "neo4j_exporter_up", labels); !ok || up != 1 {
-		t.Errorf("neo4j_exporter_up = %v ok=%v, want 1", up, ok)
-	}
+	assertMetric(t, mfs, "neo4j_exporter_up", labels, 1)
 }
+

@@ -9,11 +9,6 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
-
 podAnnotations:
   prometheus.io/scrape: "true"
   prometheus.io/port: "9121"
